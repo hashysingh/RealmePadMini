@@ -97,57 +97,6 @@ jobs:
             report/
           retention-days: 3
           compression-level: 0
-      - name: Upload finished image to Google Drive (optional)
-        if: success()
-        continue-on-error: true
-        shell: bash
-        env:
-          RCLONE_CONFIG_B64: ${{ secrets.RCLONE_CONFIG_B64 }}
-          DRIVE_DESTINATION: ${{ vars.DRIVE_DESTINATION }}
-        run: |
-          set -euo pipefail
-          if [ -z "$RCLONE_CONFIG_B64" ]; then
-            echo "Google Drive upload skipped: add repository secret RCLONE_CONFIG_B64 to enable it."
-            exit 0
-          fi
-          if [ -z "$DRIVE_DESTINATION" ]; then
-            echo "Google Drive upload skipped: set repository variable DRIVE_DESTINATION (e.g. gdrive:RealmePadMini)."
-            exit 0
-          fi
-          sudo apt-get install -y -qq rclone
-          CONFIG_FILE="$RUNNER_TEMP/rclone.conf"
-          (umask 077 && printf '%s' "$RCLONE_CONFIG_B64" | base64 -d > "$CONFIG_FILE")
-          if ! rclone --config "$CONFIG_FILE" listremotes | grep -q '^[a-zA-Z0-9_-]*:        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: RMP2106-debloated-super-with-removal-proof
-          path: |
-            ${{ runner.temp }}/firmware/super_debloated_sparse.img
-            report/
-          retention-days: 3
-          compression-level: 0
-      - name: Upload diagnostic reports on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: RMP2106-build-diagnostics
-          path: report/
-          if-no-files-found: warn
-          retention-days: 7
-; then
-            echo "No valid rclone remotes configured." >&2
-            exit 1
-          fi
-          IMAGE="$RUNNER_TEMP/firmware/super_debloated_sparse.img"
-          OUTPUT_NAME="RMP2106-debloated-super-${GITHUB_RUN_ID}.img"
-          rclone --config "$CONFIG_FILE" copyto "$IMAGE" "${DRIVE_DESTINATION%/}/$OUTPUT_NAME" \
-            --progress --retries 4 --low-level-retries 10
-          LOCAL_SIZE=$(stat -c %s "$IMAGE")
-          REMOTE_SIZE=$(rclone --config "$CONFIG_FILE" size "${DRIVE_DESTINATION%/}/$OUTPUT_NAME" --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["bytes"])')
-          test "$LOCAL_SIZE" = "$REMOTE_SIZE" || { echo "Google Drive size mismatch" >&2; exit 1; }
-          printf 'Uploaded Google Drive file: %s/%s\\n' "${DRIVE_DESTINATION%/}" "$OUTPUT_NAME" | tee "$GITHUB_WORKSPACE/report/google-drive-upload.txt"
-          # Never upload or expose the rclone credentials in artifacts or logs.
-          rm -f "$CONFIG_FILE"
       - name: Upload diagnostic reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
