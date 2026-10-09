@@ -38,6 +38,28 @@ def info(raw):
             partitions[current].append((offset * SECTOR, (hi - lo + 1) * SECTOR))
     return output, partitions
 
+def protected_region_digest(raw, writable_extents):
+    """Hash every raw byte outside approved partition extents, in order."""
+    size = raw.stat().st_size
+    ranges = sorted(writable_extents)
+    cursor = 0
+    h = hashlib.sha256()
+    with raw.open("rb") as src:
+        for start, length in ranges + [(size, 0)]:
+            if start < cursor or start + length > size:
+                raise ValueError("Invalid or overlapping writable extents")
+            src.seek(cursor)
+            remaining = start - cursor
+            while remaining:
+                block = src.read(min(4 * 1024 * 1024, remaining))
+                if not block:
+                    raise EOFError("Raw super image unexpectedly truncated")
+                h.update(block)
+                remaining -= len(block)
+            cursor = start + length
+    return h.hexdigest()
+
+
 def validate_manifest(file):
     cfg = json.loads(Path(file).read_text())
     if cfg.get("mode") != "dry-run-only":
@@ -134,6 +156,10 @@ def build(args):
         start, length = extents[p][0]
         if start + length > raw.stat().st_size:
             raise ValueError("Invalid out-of-bounds extent")
+    approved_ranges = [extents[p][0] for p in SUPPORTED]
+    stock_raw_size = raw.stat().st_size
+    protected_before = protected_region_digest(raw, approved_ranges)
+    print("Stock protected-region SHA256: " + protected_before, flush=True)
     image_dir = work / "edits"
     image_dir.mkdir(exist_ok=True)
     report = {"mode": "OFFLINE BUILD - NOT FLASH VALIDATED", "modified": {},
@@ -169,6 +195,15 @@ def build(args):
         file.unlink()
         report["modified"][p] = stats
         print("Modified " + p + ": " + str(len(stats)) + " targets", flush=True)
+    if raw.stat().st_size != stock_raw_size:
+        raise ValueError("Raw super image size changed")
+    protected_after = protected_region_digest(raw, approved_ranges)
+    if protected_after != protected_before:
+        raise ValueError("Protected super region changed outside system_a/product_a")
+    report["raw_size_unchanged"] = True
+    report["unmodified_regions_byte_identical"] = True
+    report["protected_region_sha256"] = protected_after
+    print("Non-target regions byte-for-byte identical; raw size unchanged", flush=True)
     updated_dump, updated_extents = info(raw)
     if original_dump != updated_dump or extents != updated_extents:
         raise ValueError("LP metadata changed unexpectedly")
