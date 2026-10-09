@@ -1,0 +1,42 @@
+name: Inspect RMP2106 super.img
+on:
+  workflow_dispatch:
+    inputs:
+      sha256:
+        description: 'Optional expected SHA-256 checksum'
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs git
+          python3 -m pip install --user 'gdown==5.2.0'
+          git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git /tmp/lptools
+          for tool in lpdump lpunpack; do
+            sudo install -m755 "/tmp/lptools/linux_glibc_x86_64/$tool" "/usr/local/bin/$tool"
+          done
+      - name: Fetch firmware with gdown
+        run: |
+          mkdir -p "$RUNNER_TEMP/firmware"
+          python3 -m gdown --fuzzy 'https://drive.google.com/file/d/1LVuewT3smLf-F-qWvzGm21Rk_z-p6Got/view' -O "$RUNNER_TEMP/firmware/super.img"
+      - name: Inspect image
+        env:
+          EXPECTED_SHA256: ${{ inputs.sha256 }}
+        run: |
+          python3 scripts/inspect.py "$RUNNER_TEMP/firmware/super.img" "$RUNNER_TEMP/firmware" "$GITHUB_WORKSPACE/report" "$EXPECTED_SHA256"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inspection-report
+          path: report/
+          retention-days: 7
+          if-no-files-found: warn
