@@ -81,8 +81,10 @@ def entries(image, folder):
         if len(items) < 6 or not items[1].isdigit():
             continue
         name = items[5]
-        if name in ("", ".", "..") or not re.fullmatch(r"[A-Za-z0-9_.+@ -]+", name):
-            raise ValueError("Unexpected filename in target tree")
+        if name in ("", ".", ".."):
+            continue
+        if not re.fullmatch(r"[A-Za-z0-9_.+@ -]+", name):
+            raise ValueError(f"Unsupported filename {name!r} under {folder!r}")
         mode = int(items[2], 8) & 0o170000
         out.append((name, mode == 0o040000))
     return out
