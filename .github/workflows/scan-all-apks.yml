@@ -48,6 +48,14 @@ jobs:
           python3 -u scripts/scan_all_apks.py \
             --partitions "$RUNNER_TEMP/firmware/partitions" \
             --report "$GITHUB_WORKSPACE/report"
+      - name: Validate exact-path debloat manifest (dry-run)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/plan_debloat.py \
+            --inventory "$GITHUB_WORKSPACE/report/all-apks.csv" \
+            --manifest "$GITHUB_WORKSPACE/config/rmp2106-debloat.json" \
+            --out "$GITHUB_WORKSPACE/report"
       - name: Upload read-only inventory
         if: always()
         uses: actions/upload-artifact@v4
