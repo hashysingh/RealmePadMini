@@ -35,3 +35,14 @@ The **Scan all EXT APK directories** workflow now also reads `config/rmp2106-deb
 - The planner does not edit images, delete files or generate any flashable package. Each directory must be reviewed for package dependencies, AVB constraints and filesystem security metadata before implementing modification.
 
 The current configuration applies **only** to the RMP2106PU_11.A.21 firmware image used to create the prior inventory. Run the updated workflow on **main** to generate a fresh plan.
+
+
+## Experimental offline debloat build (Phase 3)
+
+**Warning: this is an untested experimental builder. It does NOT produce a flash-validated image. Do not flash it to the tablet until AVB, bootloader, filesystem integrity and device recovery are assessed.**
+
+Choose **Actions → Build debloated super.img (EXPERIMENTAL) → Run workflow**, select `main` and enter `EXPERIMENTAL`. The workflow downloads the known firmware with `gdown`, checks its previously observed SHA-256, converts sparse to raw, extracts only the changed `system_a` and `product_a` partitions, and attempts to remove exactly 22 selected app directories using offline `debugfs`. It checks the modified EXT filesystems using `e2fsck -fn`. If a check fails, it stops and saves diagnostics.
+
+Rather than recreating potentially fragile logical partition metadata with guessed `lpmake` arguments, the builder writes each updated filesystem over **the same one-extent byte range inside the original raw super image**, confirming that `lpdumps` metadata is identical before and after. It then converts raw to an Android sparse image and, on success, uploads an artifact `RMP2106-experimental-debloated-super` containing the new `super_debloated_sparse.img`, SHA-256 and diagnostics. Empty B partitions and unmodified system_ext/vendor data are not touched.
+
+The build has **not** yet been executed against your firmware. Its static external tool dependency should be pinned and audited before distributing any ROM images. Repository Actions storage limits and runner disk constraints may affect the build. The build intentionally does not bypass AVB or handle flashing.
