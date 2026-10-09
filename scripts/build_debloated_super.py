@@ -176,7 +176,7 @@ def build(args):
     report["removed_target_count"] = sum(len(x) for x in report["modified"].values())
     (args.report / "build-report.json").write_text(json.dumps(report, indent=2) + "\n")
     args.output.parent.mkdir(exist_ok=True, parents=True)
-    run("img2simg", str(raw), str(args.output))
+    run("/usr/bin/img2simg", str(raw), str(args.output))
     sparse = args.output.open("rb").read(4)
     if sparse != bytes.fromhex("3aff26ed"):
         raise ValueError("Invalid sparse output")
