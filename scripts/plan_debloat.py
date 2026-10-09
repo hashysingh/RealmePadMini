@@ -88,7 +88,8 @@ def main():
                    indent=2) + "\n", encoding="utf-8")
     with (args.out / "debloat-plan.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[
-            "partition", "directory", "description", "status", "apk_count"])
+            "partition", "directory", "description", "status", "apk_count"],
+            extrasaction="ignore")
         writer.writeheader()
         writer.writerows(plan)
     print(json.dumps(summary, indent=2))
