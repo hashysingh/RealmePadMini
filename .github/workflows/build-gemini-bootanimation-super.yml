@@ -1,0 +1,78 @@
+name: Build debloated super with Gemini boot animation (experimental)
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_experimental:
+        description: 'Type EXPERIMENTAL to build an unverified diagnostic image (do NOT flash)'
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    if: inputs.confirm_experimental == 'EXPERIMENTAL'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare disk and partition utilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell /usr/local/lib/node_modules || true
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs git
+          git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git /tmp/lptools
+          sudo install -m755 /tmp/lptools/linux_glibc_x86_64/lpunpack /usr/local/bin/lpunpack
+          sudo install -m755 /tmp/lptools/linux_glibc_x86_64/lpdumps /usr/local/bin/lpdumps
+          df -h "$RUNNER_TEMP"
+      - name: Verify uploaded RMP2106 Gemini animation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'fc9221074afb9d40404bf1d1b9fd73925406f5911a0db7842462a3c060d75283  config/bootanimation.zip' | sha256sum -c -
+          file config/bootanimation.zip
+      - name: Download exact independently audited debloated super
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/debloated-original"
+          gh run download 37954304818 --repo "$GITHUB_REPOSITORY" \
+            -n RMP2106-debloated-super-with-removal-proof \
+            --dir "$RUNNER_TEMP/debloated-original"
+          IMAGE=$(find "$RUNNER_TEMP/debloated-original" -type f -name super_debloated_sparse.img -print -quit)
+          test -n "$IMAGE" && test -s "$IMAGE"
+          echo 'd1266658821f587a273e139841f861c7ae1557d3415dde8fc8990aa1e62d74f3  '"$IMAGE" | sha256sum -c -
+      - name: Replace only system_a boot animation and independently verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE=$(find "$RUNNER_TEMP/debloated-original" -type f -name super_debloated_sparse.img -print -quit)
+          python3 -u scripts/replace_bootanimation_in_super.py \
+            --image "$IMAGE" \
+            --animation "$GITHUB_WORKSPACE/config/bootanimation.zip" \
+            --work "$RUNNER_TEMP/gemini-work" \
+            --output "$RUNNER_TEMP/gemini-output" \
+            --report "$GITHUB_WORKSPACE/gemini-validation"
+          df -h "$RUNNER_TEMP"
+      - name: Upload separate diagnostic image and proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-debloated-Gemini-bootanimation-diagnostic
+          path: |
+            ${{ runner.temp }}/gemini-output/
+            gemini-validation/
+          retention-days: 3
+          compression-level: 0
+      - name: Upload failure report when available
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-Gemini-bootanimation-build-failure
+          path: gemini-validation/
+          if-no-files-found: warn
+          retention-days: 7
