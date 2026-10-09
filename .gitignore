@@ -1,0 +1,4 @@
+*.img
+*.pac
+report/
+__pycache__/
