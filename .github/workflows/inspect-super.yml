@@ -22,9 +22,10 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/gdown-venv"
           "$RUNNER_TEMP/gdown-venv/bin/pip" install 'gdown==5.2.0'
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git /tmp/lptools
-          for tool in lpdump lpunpack; do
+          for tool in lpdumps lpunpack; do
             sudo install -m755 "/tmp/lptools/linux_glibc_x86_64/$tool" "/usr/local/bin/$tool"
           done
+          command -v lpdumps lpunpack simg2img debugfs
       - name: Fetch firmware with gdown
         run: |
           mkdir -p "$RUNNER_TEMP/firmware"
