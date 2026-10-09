@@ -5,10 +5,12 @@ Read-only verification; cannot establish that AVB accepts the modified image,
 that the bootloader permits it, or that the tablet will boot.
 """
 import argparse
+import csv
 import hashlib
 import json
 import re
 import subprocess
+from scan_all_apks import scan, MAX_DIRECTORIES
 from pathlib import Path
 
 def cmd(*args):
@@ -72,6 +74,8 @@ def main():
         by_partition.setdefault(t["partition"], []).append(t["directory"])
     checks = []
     fsck = {}
+    all_apks = []
+    scan_stats = []
     for part in required:
         image = partitions / (part + ".img")
         if not image.exists():
@@ -96,13 +100,46 @@ def main():
                            "removed": not is_present})
             if is_present:
                 raise ValueError("Debloat target still exists: " + part + ":" + directory)
+        # Search the ENTIRE remaining EXT filesystem, not just known directories.
+        # This catches duplicate APK filenames in unexpected system folders.
+        apk_rows, _, scan_stat = scan(image, MAX_DIRECTORIES)
+        all_apks.extend(apk_rows)
+        scan_stats.append(scan_stat)
+        if scan_stat["truncated"] or scan_stat["directory_error_count"]:
+            raise ValueError("Incomplete full-partition APK scan: " + part +
+                             " " + json.dumps(scan_stat))
     if len(checks) != len(targets):
         raise ValueError("Not all manifest targets were checked")
+    expected_filenames = {
+        target["directory"].rstrip("/").rsplit("/", 1)[-1].lower() + ".apk"
+        for target in targets
+    }
+    unexpected_apks = [
+        row for row in all_apks
+        if row["apk_path"].rsplit("/", 1)[-1].lower() in expected_filenames
+    ]
+    with (args.report / "remaining-apks.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["partition", "apk_path", "app_directory"])
+        writer.writeheader()
+        writer.writerows(all_apks)
+    with (args.report / "removal-proof.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["partition", "directory", "removed"])
+        writer.writeheader()
+        writer.writerows(checks)
+    (args.report / "apk-scan-statistics.json").write_text(
+        json.dumps(scan_stats, indent=2) + "\n")
+    if unexpected_apks:
+        raise ValueError("APK copies with targeted filenames still exist: " +
+                         json.dumps(unexpected_apks, indent=2))
     summary = {"phase": "4 - OFFLINE VALIDATION ONLY",
                "avb_verified": False, "boot_verified": False,
                "safe_to_flash": False,
                "image_sha256": actual, "partition_names": required,
                "removed_directories_verified": len(checks),
+               "full_partition_apk_scan_complete": True,
+               "remaining_apk_count": len(all_apks),
+               "target_filename_copies_found": len(unexpected_apks),
+               "user_data_partition_checked": False,
                "filesystem_checks": fsck,
                "target_checks": checks}
     (args.report / "validation-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
