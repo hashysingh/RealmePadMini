@@ -1,0 +1,58 @@
+name: Scan all EXT APK directories
+on:
+  workflow_dispatch:
+    inputs:
+      sha256:
+        description: "Expected stock super.img SHA-256 (optional)"
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install required tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs git
+          python3 -m venv "$RUNNER_TEMP/gdown-venv"
+          "$RUNNER_TEMP/gdown-venv/bin/pip" install 'gdown==5.2.0'
+          git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git /tmp/lptools
+          sudo install -m755 /tmp/lptools/linux_glibc_x86_64/lpunpack /usr/local/bin/lpunpack
+          command -v simg2img lpunpack debugfs
+      - name: Download super.img using gdown
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/firmware"
+          "$RUNNER_TEMP/gdown-venv/bin/gdown" --fuzzy 'https://drive.google.com/file/d/1LVuewT3smLf-F-qWvzGm21Rk_z-p6Got/view' -O "$RUNNER_TEMP/firmware/super.img"
+      - name: Verify download and extract partitions
+        shell: bash
+        env:
+          EXPECTED_SHA256: ${{ inputs.sha256 }}
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare_partitions.py \
+            "$RUNNER_TEMP/firmware/super.img" \
+            "$RUNNER_TEMP/firmware" \
+            "$EXPECTED_SHA256"
+      - name: Recursively scan all EXT partitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -u scripts/scan_all_apks.py \
+            --partitions "$RUNNER_TEMP/firmware/partitions" \
+            --report "$GITHUB_WORKSPACE/report"
+      - name: Upload read-only inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-apk-inventory
+          path: report/
+          if-no-files-found: warn
+          retention-days: 7
