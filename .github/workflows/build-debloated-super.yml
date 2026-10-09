@@ -30,7 +30,10 @@ jobs:
             sudo install -m755 "/tmp/lptools/linux_glibc_x86_64/$tool" "/usr/local/bin/$tool"
           done
           test -x /usr/bin/img2simg
-          /usr/bin/img2simg --help >/dev/null 2>&1 || test $? -eq 1
+          if ldd /usr/bin/img2simg | grep -q "not found"; then
+            echo "Missing shared library for Ubuntu img2simg" >&2
+            exit 1
+          fi
           command -v simg2img lpunpack lpdumps debugfs e2fsck
           df -h "$RUNNER_TEMP"
       - name: Download stock image
