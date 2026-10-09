@@ -72,3 +72,6 @@ The successful one-shot workflow still uploads its standard GitHub artifact. It 
 4. Run **Build and prove debloated super.img** normally. On success it will additionally upload `RMP2106-debloated-super-<run-id>.img` to the destination folder and compare the remote file size. It will remain **private unless you choose to share it** in Google Drive; the workflow does not expose or create public links.
 
 Note: Changing the hosting service is not guaranteed to improve throughput; Google Drive speed depends on your account, region, and network. The existing GitHub Actions artifact remains available for three days.
+
+
+**No rebuild needed for the validated October 9 result:** Once the two GitHub settings above exist, open [Transfer existing debloated super image to Google Drive](https://github.com/hashysingh/RealmePadMini/actions/workflows/transfer-debloated-super-to-drive.yml), select `main`, leave the source run ID `37954304818` and pre-filled SHA256 intact, and run it. This pulls the original GitHub Actions artifact, verifies the exact sparse image checksum **before** copying it to Drive, and confirms the remote byte count. The source artifact expires October 12, 2026; transfer it before then. Google Drive may still download slowly depending on network conditions.
