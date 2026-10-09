@@ -54,9 +54,14 @@ def main():
     # Check known RMP2106 partition names as printed by the same lpdumps
     required = ["system_a", "product_a", "system_ext_a", "vendor_a",
                 "system_b", "product_b", "system_ext_b", "vendor_b"]
-    present = re.findall(r"^\s*Name: (\S+)\s*$", metadata, re.M)
-    if sorted(present) != sorted(required):
-        raise ValueError("Unexpected partition names: " + str(present))
+    all_names = re.findall(r"^\s*Name: (\S+)\s*$", metadata, re.M)
+    # lpdumps also displays partition-group names as "Name:" entries.
+    # These are not extractable partitions; validate them separately.
+    expected_groups = {"default", "group_unisoc_a", "group_unisoc_b"}
+    groups_present = sorted(name for name in all_names if name in expected_groups)
+    present = sorted(name for name in all_names if name not in expected_groups)
+    if present != sorted(required) or groups_present != sorted(expected_groups):
+        raise ValueError("Unexpected LP partition/group names: " + str(all_names))
     partitions = args.report / "extracted"
     partitions.mkdir(exist_ok=True)
     subprocess.run(["lpunpack", str(raw), str(partitions)], check=True)
