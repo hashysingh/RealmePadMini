@@ -39,9 +39,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -s downloaded/super_debloated_sparse.img
+          IMAGE_PATH="$(find downloaded -type f -name super_debloated_sparse.img -print -quit)"
+          test -n "$IMAGE_PATH" && test -s "$IMAGE_PATH"
           python3 -u scripts/validate_debloated_super.py \
-            --image downloaded/super_debloated_sparse.img \
+            --image "$IMAGE_PATH" \
             --manifest config/rmp2106-debloat.json \
             --expected-sha256 4251ce44af642c29a94a493a08245a10ee3e0dc419a77a3591dee3154ba22cd0 \
             --report "$GITHUB_WORKSPACE/validation-report"
