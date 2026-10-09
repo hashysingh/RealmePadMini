@@ -26,10 +26,12 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/gdown-venv"
           "$RUNNER_TEMP/gdown-venv/bin/pip" install 'gdown==5.2.0'
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git /tmp/lptools
-          for tool in lpdumps lpunpack img2simg; do
+          for tool in lpdumps lpunpack; do
             sudo install -m755 "/tmp/lptools/linux_glibc_x86_64/$tool" "/usr/local/bin/$tool"
           done
-          command -v simg2img img2simg lpunpack lpdumps debugfs e2fsck
+          test -x /usr/bin/img2simg
+          /usr/bin/img2simg --help >/dev/null 2>&1 || test $? -eq 1
+          command -v simg2img lpunpack lpdumps debugfs e2fsck
           df -h "$RUNNER_TEMP"
       - name: Download stock image
         shell: bash
