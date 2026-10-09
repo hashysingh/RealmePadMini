@@ -87,8 +87,19 @@ jobs:
           cp "$RUNNER_TEMP/phase4/apk-scan-statistics.json" "$GITHUB_WORKSPACE/report/"
           echo 'OFFLINE VALIDATION ONLY. Android /data is not contained in super.img; installed user-data copies or reinstalls cannot be ruled out. DO NOT FLASH WITHOUT DEVICE REVIEW.' > "$GITHUB_WORKSPACE/report/NOT_FLASH_VERIFIED.txt"
           df -h "$RUNNER_TEMP"
+      - name: Upload build logs and sparse image
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-debloated-super-with-removal-proof
+          path: |
+            ${{ runner.temp }}/firmware/super_debloated_sparse.img
+            report/
+          retention-days: 3
+          compression-level: 0
       - name: Upload finished image to Google Drive (optional)
         if: success()
+        continue-on-error: true
         shell: bash
         env:
           RCLONE_CONFIG_B64: ${{ secrets.RCLONE_CONFIG_B64 }}
@@ -131,26 +142,12 @@ jobs:
           OUTPUT_NAME="RMP2106-debloated-super-${GITHUB_RUN_ID}.img"
           rclone --config "$CONFIG_FILE" copyto "$IMAGE" "${DRIVE_DESTINATION%/}/$OUTPUT_NAME" \
             --progress --retries 4 --low-level-retries 10
-          rclone --config "$CONFIG_FILE" check "$RUNNER_TEMP/firmware" "${DRIVE_DESTINATION%/}" \
-            --include "$OUTPUT_NAME" --one-way --size-only || {
-              echo "Drive upload completed but folder-level check was inconclusive; verifying remote object size."
-              LOCAL_SIZE=$(stat -c %s "$IMAGE")
-              REMOTE_SIZE=$(rclone --config "$CONFIG_FILE" size "${DRIVE_DESTINATION%/}/$OUTPUT_NAME" --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["bytes"])')
-              test "$LOCAL_SIZE" = "$REMOTE_SIZE"
-            }
+          LOCAL_SIZE=$(stat -c %s "$IMAGE")
+          REMOTE_SIZE=$(rclone --config "$CONFIG_FILE" size "${DRIVE_DESTINATION%/}/$OUTPUT_NAME" --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["bytes"])')
+          test "$LOCAL_SIZE" = "$REMOTE_SIZE" || { echo "Google Drive size mismatch" >&2; exit 1; }
           printf 'Uploaded Google Drive file: %s/%s\\n' "${DRIVE_DESTINATION%/}" "$OUTPUT_NAME" | tee "$GITHUB_WORKSPACE/report/google-drive-upload.txt"
           # Never upload or expose the rclone credentials in artifacts or logs.
           rm -f "$CONFIG_FILE"
-      - name: Upload build logs and sparse image
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: RMP2106-debloated-super-with-removal-proof
-          path: |
-            ${{ runner.temp }}/firmware/super_debloated_sparse.img
-            report/
-          retention-days: 3
-          compression-level: 0
       - name: Upload diagnostic reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
