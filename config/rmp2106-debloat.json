@@ -1,0 +1,163 @@
+{
+  "device": "Realme Pad Mini RMP2106",
+  "build": "RMP2106PU_11.A.21",
+  "mode": "dry-run-only",
+  "description": "Directory-level candidates verified against the recursive stock APK inventory. No modification or flashing.",
+  "targets": [
+    {
+      "partition": "product_a.img",
+      "directory": "/app/Assistant",
+      "description": "Google Assistant"
+    },
+    {
+      "partition": "product_a.img",
+      "directory": "/app/Chrome",
+      "description": "Chrome"
+    },
+    {
+      "partition": "product_a.img",
+      "directory": "/app/Gmail2",
+      "description": "Gmail"
+    },
+    {
+      "partition": "product_a.img",
+      "directory": "/app/Keep",
+      "description": "Google Keep"
+    },
+    {
+      "partition": "product_a.img",
+      "directory": "/app/Maps",
+      "description": "Google Maps"
+    },
+    {
+      "partition": "product_a.img",
+      "directory": "/app/YouTube",
+      "description": "YouTube"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/Books",
+      "description": "Google Play Books"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/Drive",
+      "description": "Google Drive preload"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/Duo",
+      "description": "Google Duo preload"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/GoogleNews",
+      "description": "Google News"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/GoogleOne",
+      "description": "Google One"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/GooglePay",
+      "description": "Google Pay"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/GooglePayIndia",
+      "description": "Google Pay India"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/GooglePodcasts",
+      "description": "Google Podcasts"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/PlayGames",
+      "description": "Google Play Games"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/Videos",
+      "description": "Google Play Movies/Videos"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/YTMusic",
+      "description": "YouTube Music"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/YouTubeKids",
+      "description": "YouTube Kids"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/preloadapp/realme/Facebook",
+      "description": "Facebook preload"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/app/realme/FacebookManager",
+      "description": "Facebook Manager"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/priv-app/realme/FacebookInstaller",
+      "description": "Facebook Installer"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/priv-app/realme/FacebookServices",
+      "description": "Facebook Services"
+    }
+  ],
+  "review_only": [
+    {
+      "partition": "system_a.img",
+      "directory": "/system/priv-app/KidsHome",
+      "reason": "System privileged app: needs dependencies reviewed before removal"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/app/BookmarkProvider",
+      "reason": "Android data provider: removing may affect other applications"
+    },
+    {
+      "partition": "system_a.img",
+      "directory": "/system/app/BluetoothMidiService",
+      "reason": "Bluetooth functionality: leave intact initially"
+    },
+    {
+      "partition": "product_a.img",
+      "directory": "/priv-app/Velvet",
+      "reason": "Google Search / voice features may be integrated with launcher"
+    },
+    {
+      "partition": "product_a.img",
+      "directory": "/app/TrichromeLibrary",
+      "reason": "Shared WebView/Chrome library: keep pending dependency assessment"
+    },
+    {
+      "partition": "system_ext_a.img",
+      "directory": "/preloadapp/Applist",
+      "reason": "OEM preload list: inspect behavior before any change"
+    }
+  ],
+  "protected_directory_names": [
+    "GmsCore",
+    "GoogleServicesFramework",
+    "Phonesky",
+    "WebViewGoogle",
+    "TrichromeLibrary",
+    "Settings",
+    "SystemUI",
+    "PermissionController",
+    "PackageInstaller",
+    "BluetoothMidiService",
+    "KidsHome"
+  ]
+}
