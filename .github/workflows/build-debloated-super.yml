@@ -1,0 +1,91 @@
+name: Build debloated super.img (EXPERIMENTAL)
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_experimental:
+        description: 'Type EXPERIMENTAL to build an unverified firmware image (do NOT flash)'
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  build:
+    if: inputs.confirm_experimental == 'EXPERIMENTAL'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space and install tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h "$RUNNER_TEMP"
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell /usr/local/lib/node_modules || true
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs git
+          python3 -m venv "$RUNNER_TEMP/gdown-venv"
+          "$RUNNER_TEMP/gdown-venv/bin/pip" install 'gdown==5.2.0'
+          git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git /tmp/lptools
+          for tool in lpdumps lpunpack img2simg; do
+            sudo install -m755 "/tmp/lptools/linux_glibc_x86_64/$tool" "/usr/local/bin/$tool"
+          done
+          command -v simg2img img2simg lpunpack lpdumps debugfs e2fsck
+          df -h "$RUNNER_TEMP"
+      - name: Download stock image
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/firmware"
+          "$RUNNER_TEMP/gdown-venv/bin/gdown" --fuzzy 'https://drive.google.com/file/d/1LVuewT3smLf-F-qWvzGm21Rk_z-p6Got/view' -O "$RUNNER_TEMP/firmware/input.img"
+      - name: Verify firmware and convert to raw
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '4dbf410905fe93e4e04563c5cc3e97864541af1f7dd2c68ef107830c8236afe1  '"$RUNNER_TEMP/firmware/input.img" | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path(__import__('os').environ['RUNNER_TEMP'])/'firmware/input.img'
+          with p.open('rb') as f:
+              magic=f.read(4)
+          if magic != bytes.fromhex('3aff26ed'):
+              raise SystemExit('Expected sparse super.img. Refusing to continue.')
+          PY
+          simg2img "$RUNNER_TEMP/firmware/input.img" "$RUNNER_TEMP/firmware/super_raw.img"
+          rm -f "$RUNNER_TEMP/firmware/input.img"
+          df -h "$RUNNER_TEMP"
+      - name: Debloat and rebuild preserving original LP metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -u scripts/build_debloated_super.py \
+            --work "$RUNNER_TEMP/firmware" \
+            --manifest config/rmp2106-debloat.json \
+            --report "$GITHUB_WORKSPACE/report" \
+            --output "$RUNNER_TEMP/firmware/super_debloated_sparse.img"
+      - name: Final sparse image validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/firmware/super_debloated_sparse.img"
+          file "$RUNNER_TEMP/firmware/super_debloated_sparse.img"
+          sha256sum "$RUNNER_TEMP/firmware/super_debloated_sparse.img" | tee "$GITHUB_WORKSPACE/report/output-sha256.txt"
+          echo 'EXPERIMENTAL OUTPUT: NOT VERIFIED FOR FLASHING' > "$GITHUB_WORKSPACE/report/NOT_FLASH_VERIFIED.txt"
+          df -h "$RUNNER_TEMP"
+      - name: Upload build logs and sparse image
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-experimental-debloated-super
+          path: |
+            ${{ runner.temp }}/firmware/super_debloated_sparse.img
+            report/
+          retention-days: 3
+          compression-level: 0
+      - name: Upload diagnostic reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-build-diagnostics
+          path: report/
+          if-no-files-found: warn
+          retention-days: 7
