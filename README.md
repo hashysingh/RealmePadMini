@@ -24,3 +24,14 @@ The resulting **complete-apk-inventory** artifact contains:
 - `scan-statistics.json` — directories inspected and truncation/error flags
 
 **IMPORTANT:** Keyword matches are potential candidates, not verified package IDs. Do not automatically delete these paths. The report may include critical system services. An incomplete scan is reported as such. This workflow does **not** modify or repack firmware, perform AVB changes or flash the device.
+
+## Exact-path debloat plan (Phase 2: DRY RUN ONLY)
+
+The **Scan all EXT APK directories** workflow now also reads `config/rmp2106-debloat.json` and runs `scripts/plan_debloat.py` against `all-apks.csv`.
+
+- The manifest includes **22 exact app-directory candidates** verified against the prior 256-APK inventory. These include Google Assistant, Chrome, Gmail, Maps, YouTube, Google Books, Kids' video/music preloads, Google Pay/One, and Realme Facebook preloads.
+- `review_only` keeps KidsHome, Bluetooth MIDI, BookmarkProvider, TrichromeLibrary and selected integrated services out of automatic targeting.
+- The artifact now also includes `debloat-plan.csv` and `debloat-plan.json`. If a target is missing, validation fails and the artifact is still uploaded to help diagnose it.
+- The planner does not edit images, delete files or generate any flashable package. Each directory must be reviewed for package dependencies, AVB constraints and filesystem security metadata before implementing modification.
+
+The current configuration applies **only** to the RMP2106PU_11.A.21 firmware image used to create the prior inventory. Run the updated workflow on **main** to generate a fresh plan.
