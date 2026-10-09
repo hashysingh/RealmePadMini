@@ -1,4 +1,4 @@
-name: Build debloated super.img (EXPERIMENTAL)
+name: Build and offline-validate debloated super.img
 on:
   workflow_dispatch:
     inputs:
@@ -67,14 +67,22 @@ jobs:
             --manifest config/rmp2106-debloat.json \
             --report "$GITHUB_WORKSPACE/report" \
             --output "$RUNNER_TEMP/firmware/super_debloated_sparse.img"
-      - name: Final sparse image validation
+      - name: Independently validate finished image (same run)
         shell: bash
         run: |
           set -euo pipefail
-          test -s "$RUNNER_TEMP/firmware/super_debloated_sparse.img"
-          file "$RUNNER_TEMP/firmware/super_debloated_sparse.img"
-          sha256sum "$RUNNER_TEMP/firmware/super_debloated_sparse.img" | tee "$GITHUB_WORKSPACE/report/output-sha256.txt"
-          echo 'EXPERIMENTAL OUTPUT: NOT VERIFIED FOR FLASHING' > "$GITHUB_WORKSPACE/report/NOT_FLASH_VERIFIED.txt"
+          IMAGE="$RUNNER_TEMP/firmware/super_debloated_sparse.img"
+          test -s "$IMAGE"
+          file "$IMAGE"
+          sha256sum "$IMAGE" | tee "$GITHUB_WORKSPACE/report/output-sha256.txt"
+          python3 -u scripts/validate_debloated_super.py \
+            --image "$IMAGE" \
+            --manifest config/rmp2106-debloat.json \
+            --report "$RUNNER_TEMP/phase4"
+          cp "$RUNNER_TEMP/phase4/validation-summary.json" "$GITHUB_WORKSPACE/report/validation-summary.json"
+          cp "$RUNNER_TEMP/phase4/validated-lp-metadata.txt" "$GITHUB_WORKSPACE/report/validated-lp-metadata.txt"
+          cp "$RUNNER_TEMP/phase4/"*-fsck.txt "$GITHUB_WORKSPACE/report/"
+          echo 'OFFLINE VALIDATION ONLY. AVB AND DEVICE BOOT NOT VERIFIED. DO NOT FLASH.' > "$GITHUB_WORKSPACE/report/NOT_FLASH_VERIFIED.txt"
           df -h "$RUNNER_TEMP"
       - name: Upload build logs and sparse image
         if: success()
