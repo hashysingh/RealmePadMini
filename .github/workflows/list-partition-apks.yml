@@ -20,22 +20,22 @@ jobs:
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git /tmp/lptools
           sudo install -m755 /tmp/lptools/linux_glibc_x86_64/lpunpack /usr/local/bin/lpunpack
           command -v simg2img lpunpack debugfs
-      - name: Download stock super.img
+      - name: Download supplied super.img
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/firmware"
           "$RUNNER_TEMP/gdown-venv/bin/gdown" --fuzzy \
-            'https://drive.google.com/file/d/1LVuewT3smLf-F-qWvzGm21Rk_z-p6Got/view' \
+            'https://drive.google.com/file/d/14In5VC3vjPqpKfQ2cGnFWoOXZTK_Z1UK/view' \
             -O "$RUNNER_TEMP/firmware/super.img"
-      - name: Verify firmware checksum and extract logical partitions
+      - name: Identify image format and extract logical partitions
         shell: bash
         run: |
           set -euo pipefail
           python3 scripts/prepare_partitions.py \
             "$RUNNER_TEMP/firmware/super.img" \
             "$RUNNER_TEMP/firmware" \
-            "4dbf410905fe93e4e04563c5cc3e97864541af1f7dd2c68ef107830c8236afe1"
+            ""
       - name: Scan every EXT partition for APK files
         shell: bash
         run: |
