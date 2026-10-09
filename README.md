@@ -46,3 +46,10 @@ Choose **Actions → Build debloated super.img (EXPERIMENTAL) → Run workflow**
 Rather than recreating potentially fragile logical partition metadata with guessed `lpmake` arguments, the builder writes each updated filesystem over **the same one-extent byte range inside the original raw super image**, confirming that `lpdumps` metadata is identical before and after. It then converts raw to an Android sparse image and, on success, uploads an artifact `RMP2106-experimental-debloated-super` containing the new `super_debloated_sparse.img`, SHA-256 and diagnostics. Empty B partitions and unmodified system_ext/vendor data are not touched.
 
 The build has **not** yet been executed against your firmware. Its static external tool dependency should be pinned and audited before distributing any ROM images. Repository Actions storage limits and runner disk constraints may affect the build. The build intentionally does not bypass AVB or handle flashing.
+
+
+### One-shot build and offline verification
+
+The **Build and offline-validate debloated super.img** workflow now runs the build and independent validation in one GitHub Actions job. During the build, it hashes *every raw super-image byte outside the two approved writable extents* (`system_a` and `product_a`) before and after editing, and fails if **any** byte differs. This covers `_b` slot data, `vendor_a`, `system_ext_a`, metadata and any unused super-image space. It also fails if the raw image size or LP metadata changes. After sparse repacking, it unsparses and re-extracts the result, runs read-only `e2fsck -fn` checks on populated EXT partitions, and verifies all 22 targeted directories are absent. Successful runs upload the final image **and** reports together. A successful offline validation is not a guarantee that device boot will work.
+
+The user has reported an existing patched `tos-sign.img` made with `spd_dump_it dis_avb`. This repository neither patches nor verifies the device's TOS, and **does not** bypass, disable or alter AVB. Do not treat the generated image as confirmed flash-compatible without device-specific review.
