@@ -19,7 +19,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs git
-          python3 -m pip install --user 'gdown==5.2.0'
+          python3 -m venv "$RUNNER_TEMP/gdown-venv"
+          "$RUNNER_TEMP/gdown-venv/bin/pip" install 'gdown==5.2.0'
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git /tmp/lptools
           for tool in lpdump lpunpack; do
             sudo install -m755 "/tmp/lptools/linux_glibc_x86_64/$tool" "/usr/local/bin/$tool"
@@ -27,7 +28,7 @@ jobs:
       - name: Fetch firmware with gdown
         run: |
           mkdir -p "$RUNNER_TEMP/firmware"
-          python3 -m gdown --fuzzy 'https://drive.google.com/file/d/1LVuewT3smLf-F-qWvzGm21Rk_z-p6Got/view' -O "$RUNNER_TEMP/firmware/super.img"
+          "$RUNNER_TEMP/gdown-venv/bin/gdown" --fuzzy 'https://drive.google.com/file/d/1LVuewT3smLf-F-qWvzGm21Rk_z-p6Got/view' -O "$RUNNER_TEMP/firmware/super.img"
       - name: Inspect image
         env:
           EXPECTED_SHA256: ${{ inputs.sha256 }}
