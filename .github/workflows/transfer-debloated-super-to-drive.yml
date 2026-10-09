@@ -1,0 +1,66 @@
+name: Transfer existing debloated super image to Google Drive
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Successful build run containing the validated image'
+        required: true
+        default: '37954304818'
+        type: string
+      expected_image_sha256:
+        description: 'Expected image SHA256 from validation report'
+        required: true
+        default: 'd1266658821f587a273e139841f861c7ae1557d3415dde8fc8990aa1e62d74f3'
+        type: string
+permissions:
+  actions: read
+  contents: read
+jobs:
+  transfer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Confirm private Drive configuration
+        env:
+          CONFIG_B64: ${{ secrets.RCLONE_CONFIG_B64 }}
+          DRIVE_DESTINATION: ${{ vars.DRIVE_DESTINATION }}
+        run: |
+          test -n "$CONFIG_B64" || { echo "Missing GitHub secret RCLONE_CONFIG_B64" >&2; exit 1; }
+          test -n "$DRIVE_DESTINATION" || { echo "Missing GitHub variable DRIVE_DESTINATION" >&2; exit 1; }
+      - name: Download existing verified build artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || exit 1
+          mkdir -p "$RUNNER_TEMP/debloated"
+          gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            -n RMP2106-debloated-super-with-removal-proof \
+            --dir "$RUNNER_TEMP/debloated"
+          find "$RUNNER_TEMP/debloated" -maxdepth 3 -type f -printf '%p (%s bytes)\\n'
+      - name: Verify image digest and upload to private Drive
+        env:
+          CONFIG_B64: ${{ secrets.RCLONE_CONFIG_B64 }}
+          DRIVE_DESTINATION: ${{ vars.DRIVE_DESTINATION }}
+          EXPECTED_SHA256: ${{ inputs.expected_image_sha256 }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA256" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "Invalid SHA256" >&2; exit 1; }
+          IMAGE=$(find "$RUNNER_TEMP/debloated" -type f -name super_debloated_sparse.img -print -quit)
+          test -n "$IMAGE" && test -s "$IMAGE"
+          echo "$EXPECTED_SHA256  $IMAGE" | sha256sum -c -
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rclone
+          CONFIG_FILE="$RUNNER_TEMP/rclone.conf"
+          (umask 077 && printf '%s' "$CONFIG_B64" | base64 -d > "$CONFIG_FILE")
+          OUTPUT_NAME="RMP2106-debloated-super-${SOURCE_RUN_ID}.img"
+          rclone --config "$CONFIG_FILE" copyto "$IMAGE" "${DRIVE_DESTINATION%/}/$OUTPUT_NAME" \
+            --progress --retries 4 --low-level-retries 10
+          LOCAL_SIZE=$(stat -c %s "$IMAGE")
+          REMOTE_SIZE=$(rclone --config "$CONFIG_FILE" size "${DRIVE_DESTINATION%/}/$OUTPUT_NAME" --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["bytes"])')
+          test "$LOCAL_SIZE" = "$REMOTE_SIZE" || { echo "Drive file size mismatch" >&2; exit 1; }
+          echo "Transfer verified: ${DRIVE_DESTINATION%/}/$OUTPUT_NAME"
+          rm -f "$CONFIG_FILE"
