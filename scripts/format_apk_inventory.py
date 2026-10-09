@@ -27,7 +27,7 @@ def main():
     header = [
         "REALME PAD MINI - ALL APK FILES A-Z",
         "=" * 66,
-        "Source: stock RMP2106 super.img, read-only extraction",
+        "Source: supplied super.img, read-only extraction",
         "Alphabetical order: APK filename (A-Z), then partition and full path.",
         "Each entry is an APK file, not necessarily a distinct installed app.",
         "Only EXT-family partitions inside super.img are scanned; /data is not included.",
@@ -47,7 +47,7 @@ def main():
     summary = [
         "APK FILES GROUPED BY PARTITION",
         "=" * 66,
-        "Source: stock RMP2106 super.img (not modified)",
+        "Source: supplied super.img (not modified)",
         "",
     ]
     for part_stat in sorted(scanned, key=lambda r: r["partition"].casefold()):
