@@ -57,7 +57,7 @@ def main(src, work, report, expected):
     if sparse:
         call("simg2img", str(src), str(raw))
     with (report / "lpdump.txt").open("wb") as output:
-        call("lpdump", str(raw), output=output)
+        call("lpdumps", str(raw), output=output)
     out = work / "partitions"
     out.mkdir(exist_ok=True)
     call("lpunpack", str(raw), str(out))
