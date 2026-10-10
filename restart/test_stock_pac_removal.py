@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RMP2106 clean-start, offline-only PAC and 78-target app removal test.
+"""RMP2106 clean-start, offline-only PAC and 73-target app removal test.
 
 Produces no installable firmware, never repacks a PAC, flashes, or signs AVB.
 All modifications are to disposable extracted partition copies on CI runner.
@@ -43,10 +43,13 @@ def list_targets(file):
             if any(x in (".","..") for x in components):
                 raise ValueError("Traversal in manifest")
             target[current].append(line)
-    if [len(target[x]) for x in ("product_a","system_a")]!=[25,53]:
-        raise ValueError("Manifest must contain exactly 25 product + 53 system APKs")
+    if [len(target[x]) for x in ("product_a","system_a")]!=[25,48]:
+        raise ValueError("Manifest must contain exactly 25 product + 48 system APKs")
     names=[(p,x) for p,entries in target.items() for x in entries]
-    if len(set(names))!=78:raise ValueError("Duplicate entries in list")
+    if len(set(names))!=73:raise ValueError("Duplicate entries in list")
+    manifest_digest=hashlib.sha256("\n".join(sorted(p+":"+x for p,items in target.items() for x in items)).encode()).hexdigest()
+    if manifest_digest!="fdad53aa9f0665ae4bb1b3309303296596d29a55e08093e346a8c125d5923834":
+        raise ValueError("Manifest differs from user uploaded revised 73-APK list")
     return target
 
 def extract_pac(pac,output):
@@ -135,7 +138,7 @@ def main():
     a=arg.parse_args()
     a.work.mkdir(exist_ok=True,parents=True)
     entries=list_targets(a.targets)
-    print("[1/6] Validating all 78 targets",flush=True)
+    print("[1/6] Validating all 73 targets",flush=True)
     print("Counts "+json.dumps({k:len(v) for k,v in entries.items()}),flush=True)
     risk=[x for group in entries.values() for x in group if x.rsplit("/",1)[-1].removesuffix(".apk") in DANGEROUS]
     print("WARNING core function impact / not boot-tested: "+json.dumps(risk),flush=True)
