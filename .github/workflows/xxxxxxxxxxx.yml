@@ -1,10 +1,10 @@
-name: Unisoc Realme Pad Mini Total Pac Rebuilder
+name: Check Update Payload Info
 
 on:
   workflow_dispatch:
 
 jobs:
-  rebuild_pac:
+  check_info:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,139 +16,44 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install gdown and Linux Utilities
+      - name: Install gdown and p7zip
         run: |
           pip install gdown
           sudo apt-get update
-          sudo apt-get install -y simg2img img2simg bsdiff p7zip-full
+          sudo apt-get install -y p7zip-full
 
-      - name: Download Files From Google Drive
+      - name: Download update.zip From Google Drive
         run: |
           mkdir -p workspace
-          gdown --id "1vFwAIxA8AbWz9iqzMtMBZFHWma2GMJfJ" -O workspace/firmware_extracted.zip
           gdown --id "16No1NoNDuTk_Ks4HT2SedWgTJFlzGbtl" -O workspace/update.zip
 
-      - name: Extract Staging Archives
+      - name: Extract Update Archive
         run: |
           cd workspace
-          7z x firmware_extracted.zip -oextracted_pac/
           7z x update.zip -oupdate_extracted/
 
-      - name: Set Up Android Unpacking and Repacking Toolchains
+      - name: Set Up Payload Dumper Tool
         run: |
-          wget https://github.com -O lpunpack
-          wget https://github.com -O lpmake
           wget https://github.com -O payload_tool.tar.gz
           tar -xzvf payload_tool.tar.gz
-          chmod +x lpunpack lpmake payload-dumper-go
+          chmod +x payload-dumper-go
 
-      - name: Dump and Analyze OTA Update Payload
-        id: analyze_payload
+      - name: Read and Display Payload Manifest Info
         run: |
-          mkdir -p workspace/ota_patches
-          ./payload-dumper-go -o workspace/ota_patches/ workspace/update_extracted/payload.bin
-          echo "=== Detected Files in OTA Payload ==="
-          ls -lah workspace/ota_patches/
+          echo "===================================================="
+          echo "          ANALYZING PAYLOAD.BIN MANIFEST            "
+          echo "===================================================="
+          # Bypassing the full dump to read the partition manifest headers first
+          ./payload-dumper-go -l workspace/update_extracted/payload.bin
           
-          # Check if system, vendor, or system_ext patches are inside the payload
-          if ls workspace/ota_patches/system_a* workspace/ota_patches/vendor_a* workspace/ota_patches/system_ext_a* >/dev/null 2>&1; then
-            echo "SUPER_PATCH_NEEDED=true" >> $GITHUB_ENV
-            echo "Found updates targeting internal dynamic super partitions."
-          else
-            echo "SUPER_PATCH_NEEDED=false" >> $GITHUB_ENV
-            echo "No updates targeting internal super partitions found. Skipping super unpack/repack cycle."
-          fi
-
-      - name: Create Unified Output Workspace
-        run: |
-          mkdir -p workspace/output_patched_files
-          # Initialize output with ALL baseline files from the original extracted folder
-          cp workspace/extracted_pac/* workspace/output_patched_files/ 2>/dev/null || true
-
-      - name: Process Super Partition (ONLY IF NEEDED)
-        if: env.SUPER_PATCH_NEEDED == 'true'
-        run: |
-          echo "Began extraction loop for internal dynamic partitions..."
-          # Convert Sparse super.img to Raw Format
-          simg2img workspace/extracted_pac/super.img workspace/super_raw.img
+          echo ""
+          echo "===================================================="
+          echo "          EXTRACTING TARGET OPERATION MAP           "
+          echo "===================================================="
+          # Run a fast dump structure scan to display file extension parameters
+          mkdir -p workspace/info_dump
+          ./payload-dumper-go -o workspace/info_dump/ workspace/update_extracted/payload.bin
           
-          # Unpack Raw Dynamic Sub-Partitions
-          mkdir -p workspace/unpacked_super
-          ./lpunpack workspace/super_raw.img workspace/unpacked_super/
-          
-          # Set up working directory for subpartitions
-          mkdir -p workspace/patched_subpartitions
-          cp workspace/unpacked_super/* workspace/patched_subpartitions/
-          
-          # Dynamically check and patch internal system, vendor, or system_ext files
-          cd workspace/ota_patches/
-          for file in system_a* vendor_a* system_ext_a*; do
-            [ -e "$file" ] || continue
-            if [[ "$file" == *.patch ]] || [[ "$file" == *.p ]]; then
-              base_name=$(echo "$file" | sed -e 's/\.patch//g' -e 's/\.p//g')
-              echo "Patching subpartition: $base_name"
-              bspatch "../unpacked_super/$base_name" "../patched_subpartitions/$base_name" "$file"
-            else
-              echo "Replacing subpartition directly: $file"
-              cp "$file" "../patched_subpartitions/$file"
-            fi
-          done
-          
-          # Calculate current patched sizes to rebuild the table layout metadata mapping safely
-          cd ../../
-          SYS_SIZE=$(stat -c%s workspace/patched_subpartitions/system_a.img)
-          VEND_SIZE=$(stat -c%s workspace/patched_subpartitions/vendor_a.img)
-          EXT_SIZE=$(stat -c%s workspace/patched_subpartitions/system_ext_a.img)
-          SUPER_SIZE=$(stat -c%s workspace/super_raw.img)
-          
-          # Remove the old unpatched super file to replace it
-          rm -f workspace/output_patched_files/super.img
-          
-          echo "Recompiling dynamic super metadata layout blocks..."
-          ./lpmake \
-            --metadata-size 65536 \
-            --super-name super \
-            --metadata-slots 2 \
-            --device super:$SUPER_SIZE \
-            --group realme_dynamic_partitions:$SUPER_SIZE \
-            --partition system_a:none:$SYS_SIZE:realme_dynamic_partitions --image system_a=workspace/patched_subpartitions/system_a.img \
-            --partition vendor_a:none:$VEND_SIZE:realme_dynamic_partitions --image vendor_a=workspace/patched_subpartitions/vendor_a.img \
-            --partition system_ext_a:none:$EXT_SIZE:realme_dynamic_partitions --image system_ext_a=workspace/patched_subpartitions/system_ext_a.img \
-            --sparse \
-            --output workspace/output_patched_files/super.img
-
-      - name: Process Standalone External Partitions (Always Active Block Checks)
-        run: |
-          cd workspace/ota_patches/
-          # Filter files excluding the super dynamic subpartitions handled above
-          for file in *; do
-            [ -e "$file" ] || continue
-            if [[ "$file" == system_a* ]] || [[ "$file" == vendor_a* ]] || [[ "$file" == system_ext_a* ]]; then
-              continue
-            fi
-            
-            # Patch standalone file (like boot.img) if it has a .patch script
-            if [[ "$file" == *.patch ]] || [[ "$file" == *.p ]]; then
-              base_name=$(echo "$file" | sed -e 's/\.patch//g' -e 's/\.p//g')
-              if [ -f "../extracted_pac/$base_name" ]; then
-                echo "Patching standalone partition block: $base_name"
-                bspatch "../extracted_pac/$base_name" "../output_patched_files/$base_name" "$file"
-              fi
-            # Replace file directly if it's a full raw image overwrite inside payload
-            elif [[ "$file" == *.img ]] && [ -f "$file" ]; then
-              echo "Replacing standalone partition block directly: $file"
-              cp "$file" "../output_patched_files/$file"
-            fi
-          done
-
-      - name: Verify Workspace Output Configuration
-        run: |
-          echo "=== Final verification of pack directory maps ==="
-          ls -lah workspace/output_patched_files/
-
-      - name: Upload Complete Patched Firmware Matrix
-        uses: actions/upload-artifact@v4
-        with:
-          name: Full-Patched-Pac-Ready-Files
-          path: workspace/output_patched_files/*
-          if-no-files-found: error
+          echo "The following patch/image target structures are present inside this update package:"
+          ls -lah workspace/info_dump/
+          echo "===================================================="
