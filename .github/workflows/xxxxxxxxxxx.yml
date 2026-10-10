@@ -11,9 +11,9 @@ jobs:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
 
-      - name: Install gdown and p7zip
+      - name: Set Up Python and Tools
         run: |
-          pip install gdown
+          pip install gdown requests
           sudo apt-get update
           sudo apt-get install -y p7zip-full
 
@@ -26,12 +26,21 @@ jobs:
         run: |
           7z x workspace/update.zip -oworkspace/update_extracted/
 
-      - name: Set Up Payload Dumper Tool
+      - name: Download Payload Dumper via Python (Safe Link Bypass)
         run: |
-          # Download the tool binary directly (Fixed link)
-          wget https://github.com -O workspace/payload_tool.tar.gz
+          python -c '
+          import requests
+          url = "https://github.com"
+          r = requests.get(url, allow_redirects=True)
+          open("workspace/payload_tool.tar.gz", "wb").write(r.content)
+          '
+
+      - name: Extract Payload Dumper Tool
+        run: |
           cd workspace
-          tar -xzvf payload_tool.tar.gz
+          # Unpack without strict gzip boundaries using standard raw extract
+          7z x payload_tool.tar.gz
+          tar -xf payload_tool.tar
           chmod +x payload-dumper-go
 
       - name: Show Files Inside Payload
