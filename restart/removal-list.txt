@@ -63,14 +63,9 @@ system_a (system_a.img)
   /system/priv-app/BlockedNumberProvider/BlockedNumberProvider.apk
   /system/priv-app/BuiltInPrintService/BuiltInPrintService.apk
   /system/priv-app/CallLogBackup/CallLogBackup.apk
-  /system/priv-app/DynamicSystemInstallationService/DynamicSystemInstallationService.apk
-  /system/priv-app/ExternalStorageProvider/ExternalStorageProvider.apk
   /system/priv-app/FusedLocation/FusedLocation.apk
-  /system/priv-app/GooglePackageInstaller/GooglePackageInstaller.apk
-  /system/priv-app/InputDevices/InputDevices.apk
   /system/priv-app/KidsHome/KidsHome.apk
   /system/priv-app/LocalTransport/LocalTransport.apk
-  /system/priv-app/MmsService/MmsService.apk
   /system/priv-app/OppoOperationManualExp/OppoOperationManualExp.apk
   /system/priv-app/OppoOperationManualExpWifi/OppoOperationManualExpWifi.apk
   /system/priv-app/realme/AfterSalesService/AfterSalesService.apk
