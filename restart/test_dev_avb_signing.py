@@ -60,7 +60,7 @@ def verify_offline_dev_metadata(avbtool,stock_vbmeta_dir,modified_partitions,has
                 "--do_not_append_vbmeta_image",
                 "--do_not_generate_fec")
             info=run("python3",avbtool,"info_image","--image",devmeta)
-            matching=re.search(r"(?m)^\\s*Algorithm:\\s*(\\S+)",info)
+            matching=re.search(r"(?m)^\s*Algorithm:\s*(\S+)",info)
             if not matching or matching.group(1)!="SHA256_RSA4096":
                 raise ValueError("Development signature algorithm mismatch "+partition)
             new_info=scratch/(partition+"-dev-inspection.txt")
