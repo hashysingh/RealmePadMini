@@ -1,0 +1,78 @@
+name: Offline custom AVB prototype (NO FLASH)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prototype:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: "1/5 - Prepare AVB and partition tools"
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell || true
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils android-sdk-fec-utils openssl git
+          git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git "$RUNNER_TEMP/lptools"
+          sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpunpack" /usr/local/bin/lpunpack
+          git clone --depth 1 https://android.googlesource.com/platform/external/avb "$RUNNER_TEMP/avb"
+          command -v fec lpunpack simg2img openssl
+          python3 "$RUNNER_TEMP/avb/avbtool.py" version
+          echo "::notice title=Development prototype::This is NOT a flashing workflow and will NOT output a flashable PAC."
+      - name: "2/5 - Retrieve exactly known debloated firmware from GitHub"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/inputs/modified"
+          gh run download 37954304818 --repo "$GITHUB_REPOSITORY" -n RMP2106-debloated-super-with-removal-proof --dir "$RUNNER_TEMP/inputs/modified"
+          IMAGE="$RUNNER_TEMP/inputs/modified/super_debloated_sparse.img"
+          echo "d1266658821f587a273e139841f861c7ae1557d3415dde8fc8990aa1e62d74f3  $IMAGE" | sha256sum -c -
+      - name: "3/5 - Retrieve and inspect all five original signed PAC vbmeta images"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/inputs/avb"
+          gh run download 38019438739 --repo "$GITHUB_REPOSITORY" -n RMP2106-original-PAC-AVB-inspection --dir "$RUNNER_TEMP/inputs/avb"
+          python3 -u scripts/review_avb_trust_chain.py --input "$RUNNER_TEMP/inputs/avb" --report "$GITHUB_WORKSPACE/avb-preflight"
+          echo "::notice title=Verified original chain::All five stock vbmeta images passed required preflight."
+      - name: "4/5 - Attempt offline hashtree/FEC rebuild with ephemeral development key"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -u scripts/offline_dev_avb_prototype.py \
+            --image "$RUNNER_TEMP/inputs/modified/super_debloated_sparse.img" \
+            --stock-reports "$RUNNER_TEMP/inputs/avb" \
+            --avbtool "$RUNNER_TEMP/avb/avbtool.py" \
+            --work "$RUNNER_TEMP/working" \
+            --report "$GITHUB_WORKSPACE/avb-prototype-report"
+      - name: "5/5 - Upload ONLY reports; never keys, partitions or untrusted firmware"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-development-AVB-prototype-reports
+          path: |
+            avb-preflight/
+            avb-prototype-report/
+          if-no-files-found: warn
+          retention-days: 21
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## Offline development AVB prototype" >> "$GITHUB_STEP_SUMMARY"
+          if test -f avb-prototype-report/REPORT.md; then
+            cat avb-prototype-report/REPORT.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No prototype report produced; inspect first failing step." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Nothing in this workflow is device-installable.**" >> "$GITHUB_STEP_SUMMARY"
