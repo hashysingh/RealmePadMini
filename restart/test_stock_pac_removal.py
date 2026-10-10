@@ -150,11 +150,17 @@ def main():
         avb=a.work/"pac"/(name.lower()+".img")
         r=subprocess.run(["python3",str(a.avbtool),"info_image","--image",str(avb)],
                          capture_output=True,text=True)
-        match=re.search(r"(?m)^\s*Algorithm:\s*(\S+)",r.stdout)
-        if r.returncode or not match or match.group(1)!="SHA256_RSA4096":
+        # Read the signed image's binary AVB header instead of relying on
+        # avbtool formatting (its Algorithm line may not be parseable).
+        with avb.open("rb") as handle:
+            header=handle.read(32)
+        algorithm_type=struct.unpack_from(">I",header,28)[0]
+        # AVB_ALGORITHM_TYPE_SHA256_RSA4096 = 2, independently confirmed
+        # on the five user-uploaded original PAC vbmeta images.
+        if r.returncode or algorithm_type!=2:
             raise ValueError(
                 "Could not inspect original "+name+
-                " (exit="+str(r.returncode)+", algorithm="+repr(match.group(1) if match else None)+")"+
+                " (exit="+str(r.returncode)+", binary_algorithm_type="+str(algorithm_type)+")"+
                 "\nstdout tail: "+r.stdout[-1300:]+
                 "\nstderr tail: "+r.stderr[-1300:])
         print("AVB inspected "+name+"; rsa4096",flush=True)
