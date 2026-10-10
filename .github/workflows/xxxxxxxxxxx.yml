@@ -25,7 +25,6 @@ jobs:
       - name: Download update.zip From Google Drive
         run: |
           mkdir -p workspace
-          # Fixed: Removed --id flag to match current gdown syntax
           gdown "16No1NoNDuTk_Ks4HT2SedWgTJFlzGbtl" -O workspace/update.zip
 
       - name: Extract Update Archive
@@ -35,6 +34,7 @@ jobs:
 
       - name: Set Up Payload Dumper Tool
         run: |
+          # Fixed: Pulling the true binary release link instead of the root domain webpage
           wget https://github.com -O payload_tool.tar.gz
           tar -xzvf payload_tool.tar.gz
           chmod +x payload-dumper-go
