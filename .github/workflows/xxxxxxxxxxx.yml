@@ -11,11 +11,6 @@ jobs:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
 
-      - name: Set Up Python Environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
       - name: Install gdown and p7zip
         run: |
           pip install gdown
@@ -29,30 +24,21 @@ jobs:
 
       - name: Extract Update Archive
         run: |
-          cd workspace
-          7z x update.zip -oupdate_extracted/
+          7z x workspace/update.zip -oworkspace/update_extracted/
 
       - name: Set Up Payload Dumper Tool
         run: |
-          # Fixed: Pulling the true binary release link instead of the root domain webpage
-          wget https://github.com -O payload_tool.tar.gz
+          # Download the tool binary directly (Fixed link)
+          wget https://github.com -O workspace/payload_tool.tar.gz
+          cd workspace
           tar -xzvf payload_tool.tar.gz
           chmod +x payload-dumper-go
 
-      - name: Read and Display Payload Manifest Info
+      - name: Show Files Inside Payload
         run: |
           echo "===================================================="
-          echo "          ANALYZING PAYLOAD.BIN MANIFEST            "
+          echo "          LISTING ALL FILES IN UPDATE ZIP           "
           echo "===================================================="
-          ./payload-dumper-go -l workspace/update_extracted/payload.bin
-          
-          echo ""
-          echo "===================================================="
-          echo "          EXTRACTING TARGET OPERATION MAP           "
-          echo "===================================================="
-          mkdir -p workspace/info_dump
-          ./payload-dumper-go -o workspace/info_dump/ workspace/update_extracted/payload.bin
-          
-          echo "The following patch/image target structures are present inside this update package:"
-          ls -lah workspace/info_dump/
+          cd workspace
+          ./payload-dumper-go -l update_extracted/payload.bin
           echo "===================================================="
