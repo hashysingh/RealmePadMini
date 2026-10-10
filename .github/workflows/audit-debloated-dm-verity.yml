@@ -67,26 +67,12 @@ jobs:
         if: always()
         shell: bash
         run: |
-          {
-            echo "## RMP2106 dm-verity inspection"
-            echo ""
-            echo "**Read-only verification. Nothing was flashed.**"
-            echo ""
-            if test -f verity-report/dm-verity-comparison.json; then
-              python3 - <<'PY'
-import json, os
-with open("verity-report/dm-verity-comparison.json") as f:
-    data=json.load(f)
-path=os.environ["GITHUB_STEP_SUMMARY"]
-with open(path,"a") as f:
-    f.write("| Partition | Stock matches signed root | Modified matches signed root |\\n")
-    f.write("|---|---|---|\\n")
-    for item in data["results"]:
-        stock=item["checks"]["stock"]["matches_signed_original"]
-        modified=item["checks"]["modified"]["matches_signed_original"]
-        f.write(f"| {item['partition']} | {'YES' if stock else 'NO'} | {'YES' if modified else 'NO'} |\\n")
-PY
-            else
-              echo "The audit did not produce a result JSON. Check the first failing step for details." >> "$GITHUB_STEP_SUMMARY"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "## RMP2106 dm-verity inspection" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Read-only verification. Nothing was flashed.**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if test -f verity-report/dm-verity-comparison.json; then
+            python3 -c 'import json,sys; d=json.load(open("verity-report/dm-verity-comparison.json")); print("| Partition | Stock matches signed root | Modified matches signed root |"); print("|---|---|---|"); [print("| {} | {} | {} |".format(r["partition"], "YES" if r["checks"]["stock"]["matches_signed_original"] else "NO", "YES" if r["checks"]["modified"]["matches_signed_original"] else "NO")) for r in d["results"]]' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No verification JSON was produced. Review the first failing step." >> "$GITHUB_STEP_SUMMARY"
+          fi
