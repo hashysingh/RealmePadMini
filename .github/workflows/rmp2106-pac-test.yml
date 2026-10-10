@@ -14,7 +14,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile restart/test_stock_pac_removal.py restart/test_avb_tree_rebuild.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
+          python3 -m py_compile restart/test_stock_pac_removal.py restart/test_avb_tree_rebuild.py restart/test_dev_avb_signing.py scripts/offline_dev_avb_prototype.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
           python3 - <<'PY'
           import sys
           from pathlib import Path
@@ -65,11 +65,13 @@ jobs:
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git "$RUNNER_TEMP/lptools"
           sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpunpack" /usr/local/bin/lpunpack
           git clone --depth 1 https://android.googlesource.com/platform/external/avb "$RUNNER_TEMP/avb"
-          command -v simg2img lpunpack debugfs e2fsck veritysetup
+          command -v simg2img lpunpack debugfs e2fsck veritysetup openssl
           veritysetup --help | grep -F -- "--fec-device" >/dev/null
           veritysetup --help | grep -F -- "--fec-roots" >/dev/null
           echo "::notice title=FEC support verified::veritysetup exposes forward error correction arguments."
           python3 "$RUNNER_TEMP/avb/avbtool.py" version
+          python3 "$RUNNER_TEMP/avb/avbtool.py" add_hashtree_footer --help | grep -F -- "--do_not_generate_fec" >/dev/null
+          python3 "$RUNNER_TEMP/avb/avbtool.py" verify_image --help | grep -F -- "--key" >/dev/null
           python3 -m venv "$RUNNER_TEMP/download-venv"
           "$RUNNER_TEMP/download-venv/bin/pip" install 'gdown==5.2.0'
           df -h "$RUNNER_TEMP"
@@ -81,7 +83,7 @@ jobs:
             'https://drive.google.com/file/d/1wDNZu-Nrk28suL5qPC3TxA_CcKX8WExd/view' \
             -O "$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac"
           echo '381c295640947371b604ab830da04dc6d90be4b3c99b9c9c409c73dd51320c0b  '"$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac" | sha256sum -c -
-      - name: "4/5 - Inspect all vbmeta, remove 73 APKs, rebuild scratch AVB hashtrees and FEC"
+      - name: "4/5 - Inspect all vbmeta, remove 73 APKs, rebuild scratch AVB trees/FEC and test dev-only signatures"
         shell: bash
         run: |
           set -euo pipefail
@@ -97,4 +99,4 @@ jobs:
           echo "## Fresh PAC removal validation" >> "$GITHUB_STEP_SUMMARY"
           echo "Only step logs are retained; **NO upload-artifact step and NO firmware output**." >> "$GITHUB_STEP_SUMMARY"
           echo "All binaries and private working images are disposable runner files." >> "$GITHUB_STEP_SUMMARY"
-          echo "Nothing in this workflow is installable or boot-verified; OEM AVB signatures remain invalid even if FEC generation passes." >> "$GITHUB_STEP_SUMMARY"
+          echo "Nothing in this workflow is installable or boot-verified; OEM AVB signing keys are unavailable; development signatures do not establish bootloader trust." >> "$GITHUB_STEP_SUMMARY"
