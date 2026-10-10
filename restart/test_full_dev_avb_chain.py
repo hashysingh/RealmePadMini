@@ -72,8 +72,12 @@ def main():
                 raise ValueError("Unexpected stock AVB signing or flags "+name)
             stocks[name]=(top,descriptors)
         root_descriptors=stocks["vbmeta"][1]
+        print("STOCK ROOT DESCRIPTOR INVENTORY:",flush=True)
+        for i,item in enumerate(root_descriptors,1):
+            fields=item["fields"]
+            print("  "+str(i)+": type="+item["type"]+" partition="+str(fields.get("Partition Name"))+" keys="+",".join(sorted(fields)),flush=True)
         if len(root_descriptors)!=4 or any(x["type"]!="Chain Partition" for x in root_descriptors):
-            raise ValueError("Stock root includes descriptors not preserved by this prototype")
+            raise ValueError("Stock root has additional descriptors; must preserve them before development re-signing")
         for name in ("vbmeta","vbmeta_system","vbmeta_product"):
             key=tmp/(name+"-TEMP-UNTRUSTED.pem")
             run("openssl","genrsa","-out",key,"4096")
