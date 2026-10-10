@@ -36,6 +36,44 @@ def public_key_from_vbmeta(path,out):
     out.write_bytes(blob)
     return blob
 
+def stock_root_chains(image):
+    """Extract all chain descriptors and OEM public keys straight from AVB0 bytes."""
+    with image.open("rb") as fd:
+        head=fd.read(256)
+        if len(head)!=256 or head[:4]!=b"AVB0":
+            raise ValueError("Invalid root vbmeta header")
+        auth_size=struct.unpack_from(">Q",head,12)[0]
+        aux_size=struct.unpack_from(">Q",head,20)[0]
+        desc_offset=struct.unpack_from(">Q",head,96)[0]
+        desc_size=struct.unpack_from(">Q",head,104)[0]
+        if not (desc_size>0 and desc_offset+desc_size<=aux_size and
+                256+auth_size+aux_size<=image.stat().st_size):
+            raise ValueError("Out-of-bounds root AVB descriptors")
+        fd.seek(256+auth_size+desc_offset)
+        buf=fd.read(desc_size)
+    result={}
+    cursor=0
+    while cursor<len(buf):
+        if len(buf)-cursor<16:raise ValueError("Truncated root descriptor")
+        tag,following=struct.unpack_from(">QQ",buf,cursor)
+        total=16+following
+        if total<16 or total%8 or cursor+total>len(buf):
+            raise ValueError("Malformed root descriptor size")
+        if tag!=4 or total<92:
+            raise ValueError("Unexpected non-chain root descriptor tag "+str(tag))
+        location,name_len,key_len=struct.unpack_from(">III",buf,cursor+16)
+        if not name_len or key_len<512 or 92+name_len+key_len>total:
+            raise ValueError("Malformed chain descriptor sizes")
+        name=buf[cursor+92:cursor+92+name_len].decode("utf-8")
+        key=buf[cursor+92+name_len:cursor+92+name_len+key_len]
+        if not re.fullmatch(r"[a-z0-9_]+",name) or name in result:
+            raise ValueError("Invalid/duplicate root chain name "+name)
+        result[name]=(location,key)
+        cursor+=total
+    if cursor!=len(buf) or len(result)!=13:
+        raise ValueError("Expected exactly 13 OEM root chains, found "+str(len(result)))
+    return result
+
 def cut_prefix(source,out,length):
     with source.open("rb") as fd,out.open("wb") as dst:
         while length:
@@ -76,8 +114,11 @@ def main():
         for i,item in enumerate(root_descriptors,1):
             fields=item["fields"]
             print("  "+str(i)+": type="+item["type"]+" partition="+str(fields.get("Partition Name"))+" keys="+",".join(sorted(fields)),flush=True)
-        if len(root_descriptors)!=4 or any(x["type"]!="Chain Partition" for x in root_descriptors):
-            raise ValueError("Stock root has additional descriptors; must preserve them before development re-signing")
+        expected_root_chains=stock_root_chains(a.stock/"vbmeta.img")
+        displayed={d["fields"].get("Partition Name") for d in root_descriptors if d["type"]=="Chain Partition"}
+        if len(root_descriptors)!=13 or displayed!=set(expected_root_chains):
+            raise ValueError("Binary and avbtool root chain inventory disagree")
+        print("STOCK ROOT ALL 13 CHAINS VERIFIED:",",".join(sorted(expected_root_chains)),flush=True)
         for name in ("vbmeta","vbmeta_system","vbmeta_product"):
             key=tmp/(name+"-TEMP-UNTRUSTED.pem")
             run("openssl","genrsa","-out",key,"4096")
@@ -131,27 +172,39 @@ def main():
                 shutil.copyfile(a.stock/(name+".img"),destination)
                 children[name]=destination
                 print("UNCHANGED OEM CHILD "+name,flush=True)
+        # Preserve all 11 unaffected OEM root descriptors' exact key bytes,
+        # partition names and rollback locations. Replace only system/product keys.
         chain=[]
-        for name in CHILDREN:
-            match=[d for d in root_descriptors if d["fields"].get("Partition Name")==name]
-            if len(match)!=1:raise ValueError("Missing or duplicate root chain "+name)
-            location=number(match[0]["fields"]["Rollback Index Location"])
-            chain.extend(["--chain_partition",name+":"+str(location)+":"+str(pub[name])])
+        expected_keys={}
+        for name,(location,original_key) in expected_root_chains.items():
+            if name in ("vbmeta_system","vbmeta_product"):
+                chosen=pub[name].read_bytes()
+            else:
+                chosen=original_key
+            out=tmp/(name+"-root-key.avbpubkey")
+            out.write_bytes(chosen)
+            expected_keys[name]=(location,chosen)
+            chain.extend(["--chain_partition",name+":"+str(location)+":"+str(out)])
+        if len(expected_keys)!=13:raise ValueError("Not all OEM root chains preserved")
         root=tmp/"vbmeta.img"
         root_top=stocks["vbmeta"][0]
         run("python3",a.avbtool,"make_vbmeta_image",
             "--output",root,"--algorithm","SHA256_RSA4096","--key",keys["vbmeta"],
             "--rollback_index",str(number(root_top["Rollback Index"])),*chain)
         top,descriptors=inspect(a.avbtool,root)
-        if top.get("Algorithm")!="SHA256_RSA4096" or len(descriptors)!=4:
+        if top.get("Algorithm")!="SHA256_RSA4096" or len(descriptors)!=13:
             raise ValueError("Development root chain malformed")
+        result_chains=stock_root_chains(root)
+        if result_chains!=expected_keys:
+            raise ValueError("Root chain changed an unexpected key, name, or rollback location")
         for name in CHILDREN:
             match=[d for d in descriptors if d["type"]=="Chain Partition"
                    and d["fields"].get("Partition Name")==name]
             if len(match)!=1:raise ValueError("Development root chain omits "+name)
+        print("ALL 13 ROOT CHAIN DESCRIPTORS PRESERVED; only system/product keys changed",flush=True)
         run("python3",a.avbtool,"verify_image","--image",root,"--key",keys["vbmeta"])
         print("DEVELOPMENT ROOT SIGNATURE VERIFIED (OEM trust NOT established)",flush=True)
-        print("FIVE-NODE DEVELOPMENT CHAIN TEST PASSED; all ephemeral metadata destroyed after script exits",flush=True)
+        print("THIRTEEN-DESCRIPTOR DEVELOPMENT CHAIN TEST PASSED; all ephemeral metadata destroyed after script exits",flush=True)
         print("DO NOT FLASH: OEM root signature and OEM child keys for modified partitions are replaced by untrusted temporary keys.",flush=True)
 
 if __name__=="__main__":main()
