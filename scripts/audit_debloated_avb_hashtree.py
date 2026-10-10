@@ -98,15 +98,22 @@ def merkle_root(image, descriptor):
     if capacity < 2:
         raise ValueError("Invalid Merkle fan-out")
     current = []
+    total_blocks = image_size // data_block
+    print(f"[dm-verity] Hashing {image.name}: {total_blocks:,} data blocks ({image_size:,} bytes)", flush=True)
     with image.open("rb") as stream:
-        for _ in range(image_size // data_block):
+        for block_index in range(total_blocks):
             data = stream.read(data_block)
             if len(data) != data_block:
                 raise ValueError("Short read in " + str(image))
             current.append(hfunc(salt + data).digest())
+            if (block_index + 1) % 100000 == 0:
+                print(f"[dm-verity] {image.name}: {(block_index + 1) * 100 // total_blocks}% data hashed", flush=True)
     # The level's root is the salted hash of its padded hash block. A root digest
     # with one data block still hashes the block of leaf hashes.
+    level = 0
     while True:
+        level += 1
+        print(f"[dm-verity] {image.name}: computing Merkle level {level} ({len(current):,} digests)", flush=True)
         next_level = []
         for start in range(0, len(current), capacity):
             joined = b"".join(current[start:start + capacity]).ljust(hash_block, b"\x00")
@@ -125,10 +132,13 @@ def main():
     args = cli.parse_args()
     args.work.mkdir(parents=True, exist_ok=True)
     args.report.mkdir(parents=True, exist_ok=True)
+    print("[1/6] Verifying SHA-256 of original PAC", flush=True)
     if sha256(args.pac) != PINNED_PAC:
         raise ValueError("PAC hash differs from previously verified stock PAC")
+    print("[2/6] Verifying SHA-256 of exact delivered debloated super", flush=True)
     if sha256(args.modified) != PINNED_MODIFIED:
         raise ValueError("Modified image differs from exact delivered debloat artifact")
+    print("[3/6] Reading original signed vbmeta descriptors from PAC", flush=True)
     vbmeta = pac_descriptors(args.pac, args.work)
     # Extract stock sparse directly from verified PAC.
     with args.pac.open("rb") as f:
@@ -153,8 +163,10 @@ def main():
                 remaining -= len(chunk)
     if sha256(stock_sparse) != "4dbf410905fe93e4e04563c5cc3e97864541af1f7dd2c68ef107830c8236afe1":
         raise ValueError("PAC super payload changed")
+    print("[4/6] Original stock super confirmed; extracting logical partitions from both images", flush=True)
     extracted = {}
     for name, sparse in (("stock", stock_sparse), ("modified", args.modified)):
+        print(f"[unpack] Expanding {name} sparse super, then extracting LP partitions", flush=True)
         raw = args.work / (name + "-raw.img")
         subprocess.run(["simg2img", str(sparse), str(raw)], check=True)
         directory = args.work / (name + "-partitions")
@@ -162,6 +174,7 @@ def main():
         subprocess.run(["lpunpack", str(raw), str(directory)], check=True)
         extracted[name] = directory
         raw.unlink()
+    print("[5/6] Computing signed dm-verity Merkle roots; watch live block progress below", flush=True)
     results = []
     for partition, vbmeta_name in PARTITIONS.items():
         text, descriptors = avb_info(args.avbtool, vbmeta[vbmeta_name])
@@ -169,6 +182,7 @@ def main():
         matches = [d for d in descriptors if d.get("Partition Name") == partition]
         if len(matches) != 1:
             raise ValueError("Expected exactly one hashtree descriptor for " + partition)
+        print(f"[verity] Inspecting {partition} stock and debloated contents", flush=True)
         descriptor = matches[0]
         expected = descriptor["Root Digest"].lower()
         result = {"partition": partition, "expected_signed_root_digest": expected,
@@ -190,6 +204,7 @@ def main():
                "all_stock_match": all(r["checks"]["stock"]["matches_signed_original"] for r in results),
                "all_modified_match": all(r["checks"]["modified"]["matches_signed_original"] for r in results),
                "device_write_status": "unknown: read-only offline inspection only"}
+    print("[6/6] Writing machine-readable and human-readable verification reports", flush=True)
     (args.report / "dm-verity-comparison.json").write_text(json.dumps(summary, indent=2) + "\n")
     (args.report / "READ_ME.txt").write_text(
         "READ-ONLY ORIGINAL STOCK VS DELIVERED DEBLOATED AVB HASHTREE AUDIT\n\n"+
