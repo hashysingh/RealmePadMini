@@ -56,8 +56,8 @@ def main():
         execute("lpunpack",raw,unpack)
         raw.unlink()
         print("[5/6] Rebuild partition verity trees and FEC, sign temporary standalone vbmeta",flush=True)
-        if not shutil.which("fec"):
-            raise RuntimeError("Android fec binary missing: cannot honestly claim FEC regeneration")
+        print("NOTE: FEC regeneration deferred until compatible Android fec host utility is available",flush=True)
+        outcome["fec_regenerated"]=False
         for part in ("system","product"):
             stock=properties(a.stock_reports/("vbmeta_"+part+"-avbtool.txt"))
             orig=unpack/(part+"_a.img")
@@ -80,7 +80,8 @@ def main():
                     "--algorithm","SHA256_RSA4096","--key",key,
                     "--hash_algorithm","sha1","--salt",stock["Salt"],
                     "--block_size","4096","--fec_num_roots","2",
-                    "--output_vbmeta_image",vb,"--do_not_append_vbmeta_image")
+                    "--output_vbmeta_image",vb,"--do_not_append_vbmeta_image",
+                    "--do_not_generate_fec")
             if test.stat().st_size>logical:
                 raise ValueError("Regenerated tree+FEC exceeds logical partition: "+part)
             devinfo=execute("python3",a.avbtool,"info_image","--image",vb).stdout
@@ -98,6 +99,7 @@ def main():
                 "stock_root_digest":stock["Root Digest"],
                 "root_changed":devdesc.get("Root Digest")!=stock["Root Digest"],
                 "recomputed_fec_size":devdesc.get("FEC size"),
+                "fec_rebuild_completed":False,
                 "within_partition_size":test.stat().st_size<=logical}
             print("  completed "+part+": "+json.dumps(outcome["parts"][part]),flush=True)
         print("[6/6] Write report; delete ephemeral key and temporary images",flush=True)
@@ -110,6 +112,7 @@ def main():
         note=["# RMP2106 offline development AVB test","",
               "**Not flashable. NOT an installable PAC.**","",
               "The previously debloated super image is the input (original PAC is not redownloaded).",
+              "**FEC regeneration is NOT done; do not use the output image as firmware.**",
               "All five previously extracted original AVB binaries must be present.",
               "Temporary development signing keys and image files are NOT uploaded.",
               "An offline development signature is not an OEM signature.",
