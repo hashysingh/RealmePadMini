@@ -7,7 +7,8 @@ All modifications are to disposable extracted partition copies on CI runner.
 import argparse, hashlib, json, re, struct, subprocess
 from pathlib import Path
 from collections import Counter
-from sys import stdout
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'scripts'))
 
 from inspect_pac_avb import PAC_FMT, FILE_FMT, PAC_SIZE, FILE_SIZE, decode
 from build_debloated_super import debug, erase_tree
