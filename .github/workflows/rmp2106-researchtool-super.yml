@@ -14,7 +14,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile restart/build_researchtool_super.py restart/test_stock_pac_removal.py restart/test_avb_tree_rebuild.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
+          python3 -m py_compile restart/audit_stock_avb_chain.py restart/build_researchtool_super.py restart/test_stock_pac_removal.py restart/test_avb_tree_rebuild.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
           python3 - <<'PY'
           import sys
           from pathlib import Path
@@ -61,7 +61,7 @@ jobs:
           test -s "$RUNNER_TEMP/researchtool-output/Super.img"
           sha256sum "$RUNNER_TEMP/researchtool-output/Super.img" | tee "$RUNNER_TEMP/researchtool-output/Super.img.sha256"
           echo "## Offline Super component build" >> "$GITHUB_STEP_SUMMARY"
-          echo "Verified 73 removals, partition checksums, AVB hashtree/FEC layout, unchanged LP metadata and sparse roundtrip." >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified stock five-file AVB chain structure, 73 removals, partition checksums, AVB hashtree/FEC layout, unchanged LP metadata and sparse roundtrip." >> "$GITHUB_STEP_SUMMARY"
           echo "**IMPORTANT:** Original OEM vbmeta signatures were not updated and do NOT match the modified partitions. Bootability and ResearchTool acceptance are unverified." >> "$GITHUB_STEP_SUMMARY"
           echo "This output is only a Super PAC component. No PAC repacked; nothing flashed." >> "$GITHUB_STEP_SUMMARY"
       - name: Upload modified Super component for external ResearchTool repack
