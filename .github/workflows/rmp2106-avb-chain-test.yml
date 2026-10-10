@@ -1,4 +1,4 @@
-name: RMP2106 thirteen-descriptor AVB development test (manual)
+name: RMP2106 13-chain offline dev AVB signing (no FEC in signed descriptor)
 on:
   workflow_dispatch:
 permissions:
@@ -65,7 +65,7 @@ jobs:
           echo "Verified stock five-file AVB chain structure, 73 removals, partition checksums, AVB hashtree/FEC layout, unchanged LP metadata and sparse roundtrip." >> "$GITHUB_STEP_SUMMARY"
           echo "**IMPORTANT:** Original OEM vbmeta signatures were not updated and do NOT match the modified partitions. Bootability and ResearchTool acceptance are unverified." >> "$GITHUB_STEP_SUMMARY"
           echo "This output is only a Super PAC component. No PAC repacked; nothing flashed." >> "$GITHUB_STEP_SUMMARY"
-      - name: Verify temporary 13-descriptor development AVB chain (NO ARTIFACTS)
+      - name: Verify temporary 13-chain dev AVB signatures without FEC descriptors (NO ARTIFACTS)
         shell: bash
         run: |
           set -euo pipefail
@@ -75,5 +75,5 @@ jobs:
             --avbtool "$RUNNER_TEMP/avb/avbtool.py" \
             --work "$RUNNER_TEMP/avb-chain-scratch"
           echo "## Thirteen-descriptor offline AVB chain test" >> "$GITHUB_STEP_SUMMARY"
-          echo "The test succeeded with disposable development keys; OEM trust and on-device acceptance are NOT established." >> "$GITHUB_STEP_SUMMARY"
+          echo "Temporary RSA development signatures and chain metadata are tested. FEC is generated in Super, but is NOT described by these experimental signed child descriptors; no device or OEM trust is established." >> "$GITHUB_STEP_SUMMARY"
           echo "No AVB images, Super image, or PAC are uploaded by this workflow." >> "$GITHUB_STEP_SUMMARY"
