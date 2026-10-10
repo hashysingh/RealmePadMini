@@ -146,23 +146,28 @@ def main():
                          "--hash_algorithm","sha1","--salt",stock_desc["Salt"],
                          "--block_size","4096","--fec_num_roots","2",
                          "--rollback_index",str(number(child_top["Rollback Index"])),
-                         "--output_vbmeta_image",str(dev),"--do_not_append_vbmeta_image"]
+                         "--output_vbmeta_image",str(dev),"--do_not_append_vbmeta_image",
+                         "--do_not_generate_fec"]
                 run(*command)
                 updated=desc(a.avbtool,dev,partition)
-                for field in ("Image Size","Tree Offset","Tree Size","FEC offset","FEC size",
-                              "FEC num roots","Data Block Size","Hash Block Size","Salt","Hash Algorithm"):
+                # This development-only avbtool build omits FEC because the
+                # Android 'fec' binary is not available in the GitHub runner.
+                # Never claim this descriptor matches the stock FEC geometry.
+                for field in ("Image Size","Tree Offset","Tree Size",
+                              "Data Block Size","Hash Block Size","Salt","Hash Algorithm"):
                     if updated.get(field)!=stock_desc.get(field):
-                        raise ValueError(partition+" AVB descriptor geometry changed: "+field+
+                        raise ValueError(partition+" AVB data/tree descriptor changed: "+field+
                                          " stock="+str(stock_desc.get(field))+" new="+str(updated.get(field)))
+                if number(updated.get("FEC size","0")) != 0:
+                    raise ValueError("Expected no FEC in development-only descriptor "+partition)
                 if updated["Root Digest"].lower()==stock_desc["Root Digest"].lower():
                     raise ValueError("Expected changed root for "+partition)
                 for off,size,label in [(0,data_size,"data"),
-                                      (number(stock_desc["Tree Offset"]),number(stock_desc["Tree Size"]),"tree"),
-                                      (number(stock_desc["FEC offset"]),number(stock_desc["FEC size"]),"FEC")]:
+                                      (number(stock_desc["Tree Offset"]),number(stock_desc["Tree Size"]),"tree")]:
                     equals_range(source,child_image,off,size,partition+" "+label)
                 run("python3",a.avbtool,"verify_image","--image",dev,"--key",keys[name])
                 children[name]=dev
-                print("DEV CHILD VERIFIED "+name+" all data/tree/FEC bytes equal validated Super",flush=True)
+                print("DEV CHILD VERIFIED "+name+" data and tree agree with validated Super; DEV DESCRIPTOR EXCLUDES FEC",flush=True)
             else:
                 # Retain original OEM signature and embedded OEM public key.
                 pubkey=tmp/(name+"-OEM-unchanged.avbpubkey")
@@ -204,7 +209,7 @@ def main():
         print("ALL 13 ROOT CHAIN DESCRIPTORS PRESERVED; only system/product keys changed",flush=True)
         run("python3",a.avbtool,"verify_image","--image",root,"--key",keys["vbmeta"])
         print("DEVELOPMENT ROOT SIGNATURE VERIFIED (OEM trust NOT established)",flush=True)
-        print("THIRTEEN-DESCRIPTOR DEVELOPMENT CHAIN TEST PASSED; all ephemeral metadata destroyed after script exits",flush=True)
-        print("DO NOT FLASH: OEM root signature and OEM child keys for modified partitions are replaced by untrusted temporary keys.",flush=True)
+        print("THIRTEEN-DESCRIPTOR DEVELOPMENT SIGNING TEST PASSED (FEC NOT REPRESENTED BY SIGNED DEV DESCRIPTORS); ephemeral files discarded",flush=True)
+        print("DO NOT FLASH: development metadata lacks stock FEC descriptors and uses untrusted temporary keys.",flush=True)
 
 if __name__=="__main__":main()
