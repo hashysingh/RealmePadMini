@@ -1,0 +1,44 @@
+name: Inspect original RMP2106 PAC contents (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare disk space and Google Drive downloader
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell /usr/local/lib/node_modules || true
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install 'gdown==5.2.0'
+          df -h "$RUNNER_TEMP"
+      - name: Download original stock PAC as supplied
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pac"
+          "$RUNNER_TEMP/venv/bin/gdown" --fuzzy \
+            'https://drive.google.com/file/d/1vFwAIxA8AbWz9iqzMtMBZFHWma2GMJfJ/view' \
+            -O "$RUNNER_TEMP/pac/RMP2106-stock.pac"
+          test -s "$RUNNER_TEMP/pac/RMP2106-stock.pac"
+          sha256sum "$RUNNER_TEMP/pac/RMP2106-stock.pac"
+      - name: Inspect PAC file table and hash embedded super payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -u scripts/inspect_stock_pac.py \
+            --pac "$RUNNER_TEMP/pac/RMP2106-stock.pac" \
+            --report "$GITHUB_WORKSPACE/pac-inspection-report"
+      - name: Upload small inspection reports only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-original-PAC-read-only-inspection
+          path: pac-inspection-report/
+          if-no-files-found: warn
+          retention-days: 14
