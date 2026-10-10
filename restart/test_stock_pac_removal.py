@@ -150,13 +150,13 @@ def main():
         avb=a.work/"pac"/(name.lower()+".img")
         r=subprocess.run(["python3",str(a.avbtool),"info_image","--image",str(avb)],
                          capture_output=True,text=True)
-        match=re.search(r"(?m)^\\s*Algorithm:\\s*(\\S+)",r.stdout)
+        match=re.search(r"(?m)^\s*Algorithm:\s*(\S+)",r.stdout)
         if r.returncode or not match or match.group(1)!="SHA256_RSA4096":
             raise ValueError(
                 "Could not inspect original "+name+
                 " (exit="+str(r.returncode)+", algorithm="+repr(match.group(1) if match else None)+")"+
-                "\\nstdout tail: "+r.stdout[-1300:]+
-                "\\nstderr tail: "+r.stderr[-1300:])
+                "\nstdout tail: "+r.stdout[-1300:]+
+                "\nstderr tail: "+r.stderr[-1300:])
         print("AVB inspected "+name+"; rsa4096",flush=True)
     print("[4/6] Unpacking untouched stock super",flush=True)
     raw=a.work/"stock.raw"
