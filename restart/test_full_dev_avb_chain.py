@@ -5,8 +5,9 @@ Not OEM-trusted; never publish images or keys. Only product/system child metadat
 is regenerated. system_ext/vendor stock metadata and their public keys stay intact.
 The root is re-signed by a temporary untrusted key to reflect the two new keys.
 """
-import argparse,hashlib,re,struct,subprocess,tempfile,shutil
+import argparse,hashlib,re,struct,subprocess,tempfile,shutil,sys
 from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'scripts'))
 from audit_stock_avb_chain import parse,CHILDREN
 from test_avb_tree_rebuild import desc
 from test_dev_avb_signing import run
