@@ -15,7 +15,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile restart/test_full_dev_avb_chain.py restart/audit_stock_avb_chain.py restart/build_researchtool_super.py restart/test_stock_pac_removal.py restart/test_avb_tree_rebuild.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
-          python3 - <<'PY'
+          PYTHONPATH="$GITHUB_WORKSPACE/scripts:$GITHUB_WORKSPACE/restart" python3 - <<'PY'
+          import restart.test_full_dev_avb_chain
           import sys
           from pathlib import Path
           sys.path.insert(0, "restart")
