@@ -1,0 +1,78 @@
+name: RMP2106 full AVB chain development-signing test (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-super:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout pinned build scripts
+        uses: actions/checkout@v4
+      - name: Check exact 73-APK manifest and Python sources (no downloads)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile restart/test_full_dev_avb_chain.py restart/audit_stock_avb_chain.py restart/build_researchtool_super.py restart/test_stock_pac_removal.py restart/test_avb_tree_rebuild.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "restart")
+          from test_stock_pac_removal import list_targets
+          entries=list_targets(Path("restart/removal-list.txt"))
+          print("MANIFEST VALID:",len(entries["product_a"]),"product +",len(entries["system_a"]),"system",flush=True)
+          PY
+      - name: Install logical partition, sparse, ext4, FEC and AVB tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell || true
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs cryptsetup-bin git
+          git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git "$RUNNER_TEMP/lptools"
+          sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpunpack" /usr/local/bin/lpunpack
+          sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpdumps" /usr/local/bin/lpdumps
+          git clone --depth 1 https://android.googlesource.com/platform/external/avb "$RUNNER_TEMP/avb"
+          command -v simg2img img2simg lpunpack lpdumps debugfs e2fsck veritysetup
+          veritysetup --help | grep -F -- "--fec-device" >/dev/null
+          python3 -m venv "$RUNNER_TEMP/download-venv"
+          "$RUNNER_TEMP/download-venv/bin/pip" install 'gdown==5.2.0'
+          df -h "$RUNNER_TEMP"
+      - name: Download and verify original stock PAC
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/download-venv/bin/gdown" --fuzzy \
+            'https://drive.google.com/file/d/1wDNZu-Nrk28suL5qPC3TxA_CcKX8WExd/view' \
+            -O "$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac"
+          echo '381c295640947371b604ab830da04dc6d90be4b3c99b9c9c409c73dd51320c0b  '"$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac" | sha256sum -c -
+      - name: Build and roundtrip-verify 73-app-debloated sparse Super
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/researchtool-output"
+          python3 -u restart/build_researchtool_super.py \
+            --pac "$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac" \
+            --targets "$GITHUB_WORKSPACE/restart/removal-list.txt" \
+            --avbtool "$RUNNER_TEMP/avb/avbtool.py" \
+            --work "$RUNNER_TEMP/super-build-work" \
+            --output "$RUNNER_TEMP/researchtool-output/Super.img"
+          test -s "$RUNNER_TEMP/researchtool-output/Super.img"
+          sha256sum "$RUNNER_TEMP/researchtool-output/Super.img" | tee "$RUNNER_TEMP/researchtool-output/Super.img.sha256"
+          echo "## Offline Super component build" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified stock five-file AVB chain structure, 73 removals, partition checksums, AVB hashtree/FEC layout, unchanged LP metadata and sparse roundtrip." >> "$GITHUB_STEP_SUMMARY"
+          echo "**IMPORTANT:** Original OEM vbmeta signatures were not updated and do NOT match the modified partitions. Bootability and ResearchTool acceptance are unverified." >> "$GITHUB_STEP_SUMMARY"
+          echo "This output is only a Super PAC component. No PAC repacked; nothing flashed." >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify temporary full five-node development AVB chain (NO ARTIFACTS)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -u restart/test_full_dev_avb_chain.py \
+            --stock "$RUNNER_TEMP/super-build-work/pac" \
+            --parts "$RUNNER_TEMP/super-build-work/parts" \
+            --avbtool "$RUNNER_TEMP/avb/avbtool.py" \
+            --work "$RUNNER_TEMP/avb-chain-scratch"
+          echo "## Five-file offline AVB chain test" >> "$GITHUB_STEP_SUMMARY"
+          echo "The test succeeded with disposable development keys; OEM trust and on-device acceptance are NOT established." >> "$GITHUB_STEP_SUMMARY"
+          echo "No AVB images, Super image, or PAC are uploaded by this workflow." >> "$GITHUB_STEP_SUMMARY"
