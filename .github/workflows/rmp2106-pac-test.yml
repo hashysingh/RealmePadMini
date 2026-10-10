@@ -1,11 +1,6 @@
 name: RMP2106 fresh PAC app removal tests (NO ARTIFACTS)
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'restart/**'
-      - '.github/workflows/rmp2106-pac-test.yml'
 permissions:
   contents: read
 jobs:
