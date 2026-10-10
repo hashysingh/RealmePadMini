@@ -94,7 +94,8 @@ def merkle_root(image, descriptor):
     if not image_size or image_size % data_block or image_size > image.stat().st_size:
         raise ValueError("Invalid hashtree image size for " + str(image))
     digest_len = hfunc().digest_size
-    # AVB stores hashes in power-of-two-sized slots (SHA-1: 20 bytes padded to 32).\n    digest_slot = 1 << (digest_len - 1).bit_length()\n    capacity = hash_block // digest_slot
+    # AVB stores hashes in power-of-two-sized slots (SHA-1: 20 bytes padded to 32).
+    digest_slot = 1 << (digest_len - 1).bit_length()\n    capacity = hash_block // digest_slot
     if capacity < 2:
         raise ValueError("Invalid Merkle fan-out")
     current = []
@@ -116,7 +117,7 @@ def merkle_root(image, descriptor):
         print(f"[dm-verity] {image.name}: computing Merkle level {level} ({len(current):,} digests)", flush=True)
         next_level = []
         for start in range(0, len(current), capacity):
-            joined = b"".join(current[start:start + capacity]).ljust(hash_block, b"\x00")
+            joined = b"".join(d.ljust(digest_slot, b"\\x00") for d in current[start:start + capacity]).ljust(hash_block, b"\x00")
             next_level.append(hfunc(salt + joined).digest())
         if len(next_level) == 1:
             return next_level[0].hex()
