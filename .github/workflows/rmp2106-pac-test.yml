@@ -54,6 +54,9 @@ jobs:
           sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpunpack" /usr/local/bin/lpunpack
           git clone --depth 1 https://android.googlesource.com/platform/external/avb "$RUNNER_TEMP/avb"
           command -v simg2img lpunpack debugfs e2fsck veritysetup
+          veritysetup --help | grep -F -- "--fec-device" >/dev/null
+          veritysetup --help | grep -F -- "--fec-roots" >/dev/null
+          echo "::notice title=FEC support verified::veritysetup exposes forward error correction arguments."
           python3 "$RUNNER_TEMP/avb/avbtool.py" version
           python3 -m venv "$RUNNER_TEMP/download-venv"
           "$RUNNER_TEMP/download-venv/bin/pip" install 'gdown==5.2.0'
