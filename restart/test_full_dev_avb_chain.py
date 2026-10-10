@@ -5,7 +5,7 @@ Not OEM-trusted; never publish images or keys. Only product/system child metadat
 is regenerated. system_ext/vendor stock metadata and their public keys stay intact.
 The root is re-signed by a temporary untrusted key to reflect the two new keys.
 """
-import argparse,hashlib,re,struct,subprocess,tempfile
+import argparse,hashlib,re,struct,subprocess,tempfile,shutil
 from pathlib import Path
 from audit_stock_avb_chain import parse,CHILDREN
 from test_avb_tree_rebuild import desc
@@ -122,7 +122,9 @@ def main():
                 pubkey=tmp/(name+"-OEM-unchanged.avbpubkey")
                 public_key_from_vbmeta(a.stock/(name+".img"),pubkey)
                 pub[name]=pubkey
-                children[name]=a.stock/(name+".img")
+                destination=tmp/(name+".img")
+                shutil.copyfile(a.stock/(name+".img"),destination)
+                children[name]=destination
                 print("UNCHANGED OEM CHILD "+name,flush=True)
         chain=[]
         for name in CHILDREN:
@@ -130,7 +132,7 @@ def main():
             if len(match)!=1:raise ValueError("Missing or duplicate root chain "+name)
             location=number(match[0]["fields"]["Rollback Index Location"])
             chain.extend(["--chain_partition",name+":"+str(location)+":"+str(pub[name])])
-        root=tmp/"vbmeta-DEV-NOT-OEM.img"
+        root=tmp/"vbmeta.img"
         root_top=stocks["vbmeta"][0]
         run("python3",a.avbtool,"make_vbmeta_image",
             "--output",root,"--algorithm","SHA256_RSA4096","--key",keys["vbmeta"],
