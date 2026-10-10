@@ -14,7 +14,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile restart/test_stock_pac_removal.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
+          python3 -m py_compile restart/test_stock_pac_removal.py restart/test_avb_tree_rebuild.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
           python3 - <<'PY'
           import sys
           from pathlib import Path
@@ -22,6 +22,25 @@ jobs:
           import test_stock_pac_removal as audit
           x=audit.list_targets(Path('restart/removal-list.txt'))
           print(f"Verified {len(x['product_a'])} product + {len(x['system_a'])} system APKs",flush=True)
+          PY
+          python3 - <<'PY'
+          import hashlib,sys,tempfile
+          from pathlib import Path
+          sys.path.insert(0,"restart")
+          from test_avb_tree_rebuild import tree
+          from audit_debloated_avb_hashtree import merkle_root
+          with tempfile.TemporaryDirectory() as folder:
+              test=Path(folder)/"synthetic.img"
+              test.write_bytes(bytes(range(256))*32)
+              salt="01020304"
+              d={"Image Size":"8192","Salt":salt,"Hash Algorithm":"sha1",
+                 "Data Block Size":"4096","Hash Block Size":"4096"}
+              generated,root=tree(test,d)
+              independent=merkle_root(test,d)
+              assert len(generated)==4096,(len(generated),root)
+              assert root==independent,(root,independent)
+              assert hashlib.sha256(generated).hexdigest()
+              print("PASS: synthetic hashtree bytes and independent SHA1 Merkle root agree",flush=True)
           PY
       - name: "2/5 - Install sparse, ext4, AVB and logical partition tools"
         shell: bash
@@ -46,7 +65,7 @@ jobs:
             'https://drive.google.com/file/d/1vFwAIxA8AbWz9iqzMtMBZFHWma2GMJfJ/view' \
             -O "$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac"
           echo '381c295640947371b604ab830da04dc6d90be4b3c99b9c9c409c73dd51320c0b  '"$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac" | sha256sum -c -
-      - name: "4/5 - Inspect all stock vbmeta; require every APK and folder removed on scratch ext4"
+      - name: "4/5 - Inspect all vbmeta, remove 73 APKs and rebuild scratch AVB hashtrees"
         shell: bash
         run: |
           set -euo pipefail
@@ -62,4 +81,4 @@ jobs:
           echo "## Fresh PAC removal validation" >> "$GITHUB_STEP_SUMMARY"
           echo "Only step logs are retained; **NO upload-artifact step and NO firmware output**." >> "$GITHUB_STEP_SUMMARY"
           echo "All binaries and private working images are disposable runner files." >> "$GITHUB_STEP_SUMMARY"
-          echo "Nothing in this workflow is installable or boot-verified." >> "$GITHUB_STEP_SUMMARY"
+          echo "Nothing in this workflow is installable or boot-verified; FEC and OEM signatures remain invalid." >> "$GITHUB_STEP_SUMMARY"
