@@ -83,6 +83,7 @@ def main():
     pac_dir=x.work/"pac"
     metadata=extract_pac(x.pac,pac_dir)
     if set(metadata)!={"Super"}|REQUIRED_AVB:raise ValueError("Missing stock entries")
+    run("python3",Path(__file__).with_name("audit_stock_avb_chain.py"),"--stock",pac_dir,"--avbtool",x.avbtool)
     raw=x.work/"super-raw.img"
     run("simg2img",pac_dir/"super-stock-sparse.img",raw)
     if raw.stat().st_size!=EXPECTED_RAW_BYTES:raise ValueError("Unexpected raw super size")
