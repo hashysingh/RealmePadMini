@@ -197,6 +197,6 @@ def main():
           "new_hashtrees":avb_trees,"untrusted_development_signatures":dev_signatures,
           "UNVERIFIED":["bootability","AVB signatures","FEC","PAC repacking","device acceptance"],
           "artifact_uploaded":False,"flashable_firmware_created":False},indent=2),flush=True)
-    print("DO NOT FLASH: modified images have stale OEM AVB signatures and FEC",flush=True)
+    print("DO NOT FLASH: rebuilt FEC is offline-only; OEM AVB signatures and device trust are unavailable",flush=True)
 
 if __name__=="__main__":main()
