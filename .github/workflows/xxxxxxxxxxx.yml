@@ -25,7 +25,8 @@ jobs:
       - name: Download update.zip From Google Drive
         run: |
           mkdir -p workspace
-          gdown --id "16No1NoNDuTk_Ks4HT2SedWgTJFlzGbtl" -O workspace/update.zip
+          # Fixed: Removed --id flag to match current gdown syntax
+          gdown "16No1NoNDuTk_Ks4HT2SedWgTJFlzGbtl" -O workspace/update.zip
 
       - name: Extract Update Archive
         run: |
@@ -43,14 +44,12 @@ jobs:
           echo "===================================================="
           echo "          ANALYZING PAYLOAD.BIN MANIFEST            "
           echo "===================================================="
-          # Bypassing the full dump to read the partition manifest headers first
           ./payload-dumper-go -l workspace/update_extracted/payload.bin
           
           echo ""
           echo "===================================================="
           echo "          EXTRACTING TARGET OPERATION MAP           "
           echo "===================================================="
-          # Run a fast dump structure scan to display file extension parameters
           mkdir -p workspace/info_dump
           ./payload-dumper-go -o workspace/info_dump/ workspace/update_extracted/payload.bin
           
