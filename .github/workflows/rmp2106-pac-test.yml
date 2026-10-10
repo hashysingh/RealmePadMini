@@ -27,6 +27,7 @@ jobs:
           import hashlib,sys,tempfile
           from pathlib import Path
           sys.path.insert(0,"restart")
+          sys.path.insert(0,"scripts")
           from test_avb_tree_rebuild import tree
           from audit_debloated_avb_hashtree import merkle_root
           with tempfile.TemporaryDirectory() as folder:
