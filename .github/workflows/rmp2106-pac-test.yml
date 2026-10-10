@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Checkout exact clean-start scripts
         uses: actions/checkout@v4
-      - name: "1/5 - Lint the code and verify 78-item input (no downloads)"
+      - name: "1/5 - Lint the code and verify 73-item input (no downloads)"
         shell: bash
         run: |
           set -euo pipefail
