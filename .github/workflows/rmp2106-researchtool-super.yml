@@ -32,9 +32,9 @@ jobs:
           sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs cryptsetup-bin git
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git "$RUNNER_TEMP/lptools"
           sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpunpack" /usr/local/bin/lpunpack
-          sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpdump" /usr/local/bin/lpdump
+          sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpdumps" /usr/local/bin/lpdumps
           git clone --depth 1 https://android.googlesource.com/platform/external/avb "$RUNNER_TEMP/avb"
-          command -v simg2img img2simg lpunpack lpdump debugfs e2fsck veritysetup
+          command -v simg2img img2simg lpunpack lpdumps debugfs e2fsck veritysetup
           veritysetup --help | grep -F -- "--fec-device" >/dev/null
           python3 -m venv "$RUNNER_TEMP/download-venv"
           "$RUNNER_TEMP/download-venv/bin/pip" install 'gdown==5.2.0'
