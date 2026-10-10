@@ -64,6 +64,35 @@ def main():
             if d["type"]=="Chain Partition" and d.get("partition")}
     hashtrees={(x["name"],d["partition"]) for x in entries for d in x["descriptors"]
                if d["type"]=="Hashtree" and d.get("partition")}
+    # Mandatory, fail-closed AVB preflight for any future PAC-based prototype.
+    by_name={e["name"]:e for e in entries}
+    required={"vbmeta_system":"system","vbmeta_product":"product",
+              "vbmeta_system_ext":"system_ext","vbmeta_vendor":"vendor"}
+    main=by_name["vbmeta"]
+    if len(entries)!=5:
+        raise ValueError("All five original AVB binaries must be inspected")
+    for e in entries:
+        if e["algorithm"]!="SHA256_RSA4096":
+            raise ValueError("Unexpected vbmeta signing algorithm: "+e["name"])
+        if e["flags"] not in ("0","0x0"):
+            raise ValueError("Unexpected vbmeta flags: "+e["name"])
+        if e["rollback_index"] is None:
+            raise ValueError("Missing rollback index: "+e["name"])
+    main_chains={}
+    for d in main["descriptors"]:
+        if d["type"]=="Chain Partition" and d.get("partition"):
+            main_chains[d["partition"]]=d
+    for meta, protected in required.items():
+        if meta not in main_chains:
+            raise ValueError("Main vbmeta omits required chain: "+meta)
+        d=main_chains[meta]
+        if not d.get("public_key_fingerprint") or not d.get("rollback_location"):
+            raise ValueError("Chain lacks key fingerprint or rollback location: "+meta)
+        signed=[x for x in by_name[meta]["descriptors"]
+                if x["type"]=="Hashtree" and x.get("partition")==protected]
+        if len(signed)!=1 or signed[0].get("algorithm")!="sha1":
+            raise ValueError("Required stock hashtree missing/changed: "+meta)
+    print("PASS: all five signed vbmeta images have expected flags/signing algorithms; main chains to four verified logical partitions",flush=True)
     conclusion={
       "source":"Previously saved five vbmeta binaries and avbtool reports extracted from SHA-pinned stock PAC",
       "scope":"offline read-only inventory; no PAC redownload, no on-device modifications",
@@ -72,6 +101,7 @@ def main():
       "custom_avb_private_keys_available":False,
       "device_acceptance_of_custom_keys":"NOT TESTED",
       "unlocked_bootloader_accepts_modified_vbmeta":"NOT ESTABLISHED",
+      "mandatory_five_vbmeta_preflight":"PASS",
       "flashable_image_generated":False,
       "follow_up":"Confirm chain hierarchy and key trust through authentic device-specific documentation or read-only device evidence before making any installation plan"
     }
@@ -89,7 +119,7 @@ def main():
     lines+=["","## Hashtree descriptors"]
     if hashtrees:lines+=["- "+a+" protects "+b for a,b in sorted(hashtrees)]
     else:lines+=["- None detected (inspect avbtool source reports)"]
-    lines+=["","## Interpretation",
+    lines+=["","## Required preflight", "**PASS:** all five original vbmeta images inspected; main chains to system/product/system_ext/vendor, expected algorithms and flags present.","","## Interpretation",
             "- A valid regenerated hashtree does not establish that a device trusts the metadata signer.",
             "- OEM private signing keys are not present in the stock firmware.",
             "- Unlocked-bootloader custom-key acceptance is **unknown** from these offline reports.",
