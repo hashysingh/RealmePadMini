@@ -13,10 +13,10 @@ def stock_specs(descriptor_dir):
     for part in ("system_a","product_a"):
         filename=descriptor_dir/(part[:-2]+"-avb-descriptor.txt")
         data=filename.read_text()
-        block=re.search(r"Hashtree descriptor:(.*?)(?:\\n\\s*(?:Hashtree|Hash|Chain Partition|Prop) descriptor:|\\Z)",data,re.S)
+        block=re.search(r"Hashtree descriptor:(.*?)(?:\n\s*(?:Hashtree|Hash|Chain Partition|Prop) descriptor:|\Z)",data,re.S)
         if not block:raise ValueError("Signed stock hashtree not found: "+str(filename))
         body=block.group(1)
-        vals=dict(re.findall(r"^\\s*(Image Size|Tree Offset|Tree Size|FEC offset|FEC size|Partition Name):\\s*(.*?)\\s*$",body,re.M))
+        vals=dict(re.findall(r"^\s*(Image Size|Tree Offset|Tree Size|FEC offset|FEC size|Partition Name):\s*(.*?)\s*$",body,re.M))
         if vals.get("Partition Name")!=part[:-2]:raise ValueError("Wrong descriptor partition "+part)
         needed={"Image Size","Tree Offset","Tree Size","FEC offset","FEC size"}
         if not needed<=vals.keys():raise ValueError("Stock descriptor missing geometry "+part)
