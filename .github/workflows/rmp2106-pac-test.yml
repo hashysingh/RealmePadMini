@@ -43,6 +43,18 @@ jobs:
               assert hashlib.sha256(generated).hexdigest()
               print("PASS: synthetic hashtree bytes and independent SHA1 Merkle root agree",flush=True)
           PY
+          python3 - <<'PY'
+          # Confirm Reed-Solomon FEC coverage from OEM signed descriptors.
+          # Two parity blocks are emitted per group of 253 protected blocks.
+          layouts=[("product",1780375552,14024704,14188544),
+                   ("system",1964515328,15478784,15654912)]
+          for part,data_bytes,tree_bytes,fec_bytes in layouts:
+              protected=data_bytes+tree_bytes
+              assert protected%4096==0
+              generated=((protected//4096+252)//253)*2*4096
+              assert generated==fec_bytes,(part,generated,fec_bytes)
+              print(f"PASS {part} FEC input boundary={protected}, parity={generated}",flush=True)
+          PY
       - name: "2/5 - Install sparse, ext4, AVB and logical partition tools"
         shell: bash
         run: |
