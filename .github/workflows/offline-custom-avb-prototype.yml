@@ -1,6 +1,11 @@
 name: Offline custom AVB prototype (NO FLASH)
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/offline-custom-avb-prototype.yml'
+      - 'scripts/offline_dev_avb_prototype.py'
 permissions:
   contents: read
   actions: read
@@ -16,7 +21,6 @@ jobs:
         run: |
           set -euo pipefail
           sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell || true
-          sudo apt-get update -qq
           sudo apt-get install -y android-sdk-libsparse-utils openssl git
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git "$RUNNER_TEMP/lptools"
           sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpunpack" /usr/local/bin/lpunpack
