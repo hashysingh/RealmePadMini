@@ -94,7 +94,7 @@ def merkle_root(image, descriptor):
     if not image_size or image_size % data_block or image_size > image.stat().st_size:
         raise ValueError("Invalid hashtree image size for " + str(image))
     digest_len = hfunc().digest_size
-    capacity = hash_block // digest_len
+    # AVB stores hashes in power-of-two-sized slots (SHA-1: 20 bytes padded to 32).\n    digest_slot = 1 << (digest_len - 1).bit_length()\n    capacity = hash_block // digest_slot
     if capacity < 2:
         raise ValueError("Invalid Merkle fan-out")
     current = []
