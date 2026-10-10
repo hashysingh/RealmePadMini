@@ -34,7 +34,9 @@ def verify_offline_dev_metadata(avbtool,stock_vbmeta_dir,modified_partitions,has
             stock=desc(avbtool,stock_vbmeta_dir/("vbmeta_"+partition+".img"),partition)
             data_bytes=int(stock["Image Size"].split()[0])
             logical_size=image.stat().st_size
-            data_only=scratch/(partition+"-data-only.img")
+            # avbtool verify_image resolves the signed descriptor to <partition>.img
+            # in the standalone vbmeta directory; use that exact scratch filename.
+            data_only=scratch/(partition+".img")
             with image.open("rb") as source,data_only.open("wb") as output:
                 remaining=data_bytes
                 while remaining:
