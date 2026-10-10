@@ -135,8 +135,16 @@ def main():
     _,rechecked=geometry(roundtrip)
     if rechecked!=parts:raise ValueError("Sparse roundtrip LP geometry mismatch")
     for part in TARGETS:
-        run("lpunpack","-p",part,roundtrip,x.work/"verify-"+part)
-    # lpunpack output folders must already exist in some versions.
+        verify_dir=x.work/("verify-"+part)
+        verify_dir.mkdir(parents=True,exist_ok=True)
+        run("lpunpack","-p",part,roundtrip,verify_dir)
+        verified=verify_dir/(part+".img")
+        if not verified.is_file() or sha(verified)!=sha(images/(part+".img")):
+            raise ValueError("Sparse roundtrip unpacked "+part+" differs from validated modified partition")
+        from test_stock_pac_removal import stat_exists
+        for apk in target[part]:
+            if stat_exists(verified,apk):raise ValueError("Roundtrip restored unwanted APK: "+apk)
+        print("ROUNDTRIP PASS "+part+" APKs absent and partition SHA256 identical",flush=True)
     summary={"status":"RESEARCHTOOL SUPER COMPONENT BUILD PASSED (NOT BOOT VERIFIED)",
              "source_pac_sha256":EXPECTED_PAC,"source_sparse_super_sha256":EXPECTED_SUPER,
              "changed_partitions":results,"avb_rebuilt":avb,
