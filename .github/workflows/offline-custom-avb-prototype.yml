@@ -17,11 +17,11 @@ jobs:
           set -euo pipefail
           sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell || true
           sudo apt-get update -qq
-          sudo apt-get install -y android-sdk-libsparse-utils android-sdk-fec-utils openssl git
+          sudo apt-get install -y android-sdk-libsparse-utils openssl git
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git "$RUNNER_TEMP/lptools"
           sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpunpack" /usr/local/bin/lpunpack
           git clone --depth 1 https://android.googlesource.com/platform/external/avb "$RUNNER_TEMP/avb"
-          command -v fec lpunpack simg2img openssl
+          command -v lpunpack simg2img openssl
           python3 "$RUNNER_TEMP/avb/avbtool.py" version
           echo "::notice title=Development prototype::This is NOT a flashing workflow and will NOT output a flashable PAC."
       - name: "2/5 - Retrieve exactly known debloated firmware from GitHub"
@@ -44,7 +44,7 @@ jobs:
           gh run download 38019438739 --repo "$GITHUB_REPOSITORY" -n RMP2106-original-PAC-AVB-inspection --dir "$RUNNER_TEMP/inputs/avb"
           python3 -u scripts/review_avb_trust_chain.py --input "$RUNNER_TEMP/inputs/avb" --report "$GITHUB_WORKSPACE/avb-preflight"
           echo "::notice title=Verified original chain::All five stock vbmeta images passed required preflight."
-      - name: "4/5 - Attempt offline hashtree/FEC rebuild with ephemeral development key"
+      - name: "4/5 - Rebuild development hashtrees and signatures; record FEC as pending"
         shell: bash
         run: |
           set -euo pipefail
