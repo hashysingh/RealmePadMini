@@ -66,7 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/download-venv/bin/gdown" --fuzzy \
-            'https://drive.google.com/file/d/1vFwAIxA8AbWz9iqzMtMBZFHWma2GMJfJ/view' \
+            'https://drive.google.com/file/d/1wDNZu-Nrk28suL5qPC3TxA_CcKX8WExd/view' \
             -O "$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac"
           echo '381c295640947371b604ab830da04dc6d90be4b3c99b9c9c409c73dd51320c0b  '"$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac" | sha256sum -c -
       - name: "4/5 - Inspect all vbmeta, remove 73 APKs, rebuild scratch AVB hashtrees and FEC"
