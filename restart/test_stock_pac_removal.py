@@ -12,6 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'scripts'))
 
 from inspect_pac_avb import PAC_FMT, FILE_FMT, PAC_SIZE, FILE_SIZE, decode
 from build_debloated_super import debug, erase_tree
+from test_avb_tree_rebuild import validate as validate_avb_trees
 
 EXPECTED_PAC="381c295640947371b604ab830da04dc6d90be4b3c99b9c9c409c73dd51320c0b"
 EXPECTED_SUPER="4dbf410905fe93e4e04563c5cc3e97864541af1f7dd2c68ef107830c8236afe1"
@@ -185,9 +186,12 @@ def main():
                        "private_parent_folders_absent":sum(not x[2] for x in completed),
                        "shared_overlay_files_removed":sum(x[2] for x in completed),
                        "sha256_changed":sha(image)!=before,"fsck":"PASSED"}
-    print("[6/6] In-memory / log-only validation summary",flush=True)
+    print("[6/7] Rebuild modified hashtree bytes and independently verify Merkle roots",flush=True)
+    avb_trees=validate_avb_trees(a.avbtool,a.work/"pac",parts)
+    print("[7/7] In-memory / log-only validation summary",flush=True)
     print(json.dumps({"status":"OFFLINE APP REMOVAL TEST PASSED",
           "counts":results,"pac_entries_inspected":sorted(metadata),
+          "new_hashtrees":avb_trees,
           "UNVERIFIED":["bootability","AVB signatures","FEC","PAC repacking","device acceptance"],
           "artifact_uploaded":False,"flashable_firmware_created":False},indent=2),flush=True)
     print("DO NOT FLASH: modified images have stale OEM AVB signatures and FEC",flush=True)
