@@ -4,6 +4,7 @@
 No PAC repacking, no OEM keys, no flashing, no device trust assertions.
 """
 import argparse,hashlib,json,re,shutil,subprocess
+from audit_debloated_avb_hashtree import merkle_root
 from pathlib import Path
 
 PINNED="d1266658821f587a273e139841f861c7ae1557d3415dde8fc8990aa1e62d74f3"
@@ -91,11 +92,16 @@ def main():
                 raise ValueError("Generated descriptor mismatch: "+part)
             if integer(devdesc["Image Size"])!=image_bytes:
                 raise ValueError("AVB protected data bytes changed: "+part)
+            print("  independently recomputing "+part+" Merkle root",flush=True)
+            independently_computed=merkle_root(test,devdesc)
+            if independently_computed.lower()!=devdesc["Root Digest"].lower():
+                raise ValueError("Generated Merkle root verification failed for "+part)
             outcome["parts"][part]={
                 "dev_partition_size":test.stat().st_size,
                 "logical_partition_size":logical,
                 "regenerated_vbmeta_sha256":digest(vb),
                 "regenerated_root_digest":devdesc.get("Root Digest"),
+                "independently_verified_root":True,
                 "stock_root_digest":stock["Root Digest"],
                 "root_changed":devdesc.get("Root Digest")!=stock["Root Digest"],
                 "recomputed_fec_size":devdesc.get("FEC size"),
