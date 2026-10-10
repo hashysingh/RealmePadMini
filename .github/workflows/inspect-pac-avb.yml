@@ -1,0 +1,44 @@
+name: Inspect stock PAC AVB verification metadata (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare disk and inspection tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell || true
+          python3 -m venv "$RUNNER_TEMP/gdown-venv"
+          "$RUNNER_TEMP/gdown-venv/bin/pip" install 'gdown==5.2.0'
+          git clone --depth 1 https://android.googlesource.com/platform/external/avb "$RUNNER_TEMP/avb"
+          python3 "$RUNNER_TEMP/avb/avbtool.py" version
+      - name: Download and verify original PAC
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/gdown-venv/bin/gdown" --fuzzy \
+            'https://drive.google.com/file/d/1vFwAIxA8AbWz9iqzMtMBZFHWma2GMJfJ/view' \
+            -O "$RUNNER_TEMP/stock.pac"
+          echo '381c295640947371b604ab830da04dc6d90be4b3c99b9c9c409c73dd51320c0b  '"$RUNNER_TEMP/stock.pac" | sha256sum -c -
+      - name: Extract and analyze AVB entries only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -u scripts/inspect_pac_avb.py \
+            --pac "$RUNNER_TEMP/stock.pac" \
+            --avbtool "$RUNNER_TEMP/avb/avbtool.py" \
+            --report "$GITHUB_WORKSPACE/pac-avb-report"
+      - name: Upload small AVB report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-original-PAC-AVB-inspection
+          path: pac-avb-report/
+          if-no-files-found: warn
+          retention-days: 14
