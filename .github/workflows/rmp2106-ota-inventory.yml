@@ -1,0 +1,39 @@
+name: RMP2106 uploaded OTA payload inventory (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-ota:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository OTA and scripts
+        uses: actions/checkout@v4
+      - name: Validate ZIP and manifest with no firmware patching
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile restart/audit_incremental_ota.py
+          test -s update.zip
+          python3 -u restart/audit_incremental_ota.py \
+            --zip update.zip \
+            --report "$RUNNER_TEMP/ota-report.json"
+          python3 - <<'PY'
+          import json,os
+          with open(os.environ["RUNNER_TEMP"]+"/ota-report.json") as f:r=json.load(f)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write("## Verified repository OTA inspection\n")
+              f.write("Source: `"+r["metadata"].get("pre-build","unknown")+"`\n\n")
+              f.write("Target: `"+r["metadata"].get("post-build","unknown")+"`\n\n")
+              f.write("| Partition | Old size | New size | Operations | Uses source blocks |\n|---|---:|---:|---:|---|\n")
+              for item in r["partitions"]:
+                  f.write("| "+item["partition"]+" | "+str(item["old"]["size"] if item["old"] else "?")+" | "+str(item["new"]["size"] if item["new"] else "?")+" | "+str(item["operation_count"])+" | "+str(item["uses_source_extents"])+" |\n")
+              f.write("\n**Caution:** Old sizes matching stock PAC are NOT enough to prove old partition SHA-256 matches. OTA cannot be applied to debloated Super without exact source-hash verification. No image generation or flashing.\n")
+      - name: Upload JSON inventory only (no firmware images)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-OTA-readonly-report
+          path: ${{ runner.temp }}/ota-report.json
+          if-no-files-found: error
+          retention-days: 7
