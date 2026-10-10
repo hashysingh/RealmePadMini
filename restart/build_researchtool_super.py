@@ -20,7 +20,7 @@ def run(*args):
     subprocess.run([str(x) for x in args],check=True)
 
 def geometry(raw):
-    p=subprocess.run(["lpdump",str(raw)],text=True,capture_output=True,check=True)
+    p=subprocess.run(["lpdumps",str(raw)],text=True,capture_output=True,check=True)
     result={}
     current=None
     for line in p.stdout.splitlines():
