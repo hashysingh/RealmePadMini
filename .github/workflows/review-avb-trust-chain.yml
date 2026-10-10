@@ -1,0 +1,48 @@
+name: Stock AVB trust-chain inventory (no PAC download)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: "1/3 - Fetch previously audited stock AVB reports (small GitHub artifact)"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/avb"
+          gh run download 38019438739 --repo "$GITHUB_REPOSITORY" -n RMP2106-original-PAC-AVB-inspection --dir "$RUNNER_TEMP/avb"
+          test -s "$RUNNER_TEMP/avb/vbmeta-avbtool.txt"
+          test -s "$RUNNER_TEMP/avb/vbmeta_system-avbtool.txt"
+          test -s "$RUNNER_TEMP/avb/vbmeta_product-avbtool.txt"
+          echo "::notice title=Cached reports::No Google Drive download, no new PAC extraction."
+      - name: "2/3 - Inventory keys, flags, rollback indices and descriptor chain"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -u scripts/review_avb_trust_chain.py --input "$RUNNER_TEMP/avb" --report "$GITHUB_WORKSPACE/trust-chain-report"
+      - name: "3/3 - Upload small report"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RMP2106-stock-AVB-trust-chain
+          path: trust-chain-report/
+          if-no-files-found: warn
+          retention-days: 21
+      - name: Display report
+        if: always()
+        shell: bash
+        run: |
+          echo "## Stock AVB trust-chain review" >> "$GITHUB_STEP_SUMMARY"
+          if test -f trust-chain-report/REPORT.md; then
+            cat trust-chain-report/REPORT.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Parser did not finish; inspect the previous step." >> "$GITHUB_STEP_SUMMARY"
+          fi
