@@ -1,0 +1,70 @@
+name: RMP2106 fresh PAC app removal tests (NO ARTIFACTS)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'restart/**'
+      - '.github/workflows/rmp2106-pac-test.yml'
+permissions:
+  contents: read
+jobs:
+  test-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Checkout exact clean-start scripts
+        uses: actions/checkout@v4
+      - name: "1/5 - Lint the code and verify 78-item input (no downloads)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile restart/test_stock_pac_removal.py scripts/inspect_pac_avb.py scripts/build_debloated_super.py
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0,'restart')
+          import test_stock_pac_removal as audit
+          x=audit.list_targets(Path('restart/removal-list.txt'))
+          print(f"Verified {len(x['product_a'])} product + {len(x['system_a'])} system APKs",flush=True)
+          PY
+      - name: "2/5 - Install sparse, ext4, AVB and logical partition tools"
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet /usr/local/share/powershell || true
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs git
+          git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools.git "$RUNNER_TEMP/lptools"
+          sudo install -m755 "$RUNNER_TEMP/lptools/linux_glibc_x86_64/lpunpack" /usr/local/bin/lpunpack
+          git clone --depth 1 https://android.googlesource.com/platform/external/avb "$RUNNER_TEMP/avb"
+          command -v simg2img lpunpack debugfs e2fsck
+          python3 "$RUNNER_TEMP/avb/avbtool.py" version
+          python3 -m venv "$RUNNER_TEMP/download-venv"
+          "$RUNNER_TEMP/download-venv/bin/pip" install 'gdown==5.2.0'
+          df -h "$RUNNER_TEMP"
+      - name: "3/5 - Download ORIGINAL full PAC once (hash is checked before extraction)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/download-venv/bin/gdown" --fuzzy \
+            'https://drive.google.com/file/d/1vFwAIxA8AbWz9iqzMtMBZFHWma2GMJfJ/view' \
+            -O "$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac"
+          echo '381c295640947371b604ab830da04dc6d90be4b3c99b9c9c409c73dd51320c0b  '"$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac" | sha256sum -c -
+      - name: "4/5 - Inspect all stock vbmeta; require every APK and folder removed on scratch ext4"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -u restart/test_stock_pac_removal.py \
+            --pac "$RUNNER_TEMP/RMP2106PU_11.A.21-original.pac" \
+            --targets "$GITHUB_WORKSPACE/restart/removal-list.txt" \
+            --work "$RUNNER_TEMP/scratch-firmware" \
+            --avbtool "$RUNNER_TEMP/avb/avbtool.py"
+      - name: "5/5 - Explicitly forbid firmware artifact publishing in test phase"
+        if: always()
+        shell: bash
+        run: |
+          echo "## Fresh PAC removal validation" >> "$GITHUB_STEP_SUMMARY"
+          echo "Only step logs are retained; **NO upload-artifact step and NO firmware output**." >> "$GITHUB_STEP_SUMMARY"
+          echo "All binaries and private working images are disposable runner files." >> "$GITHUB_STEP_SUMMARY"
+          echo "Nothing in this workflow is installable or boot-verified." >> "$GITHUB_STEP_SUMMARY"
